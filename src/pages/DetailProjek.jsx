@@ -20,7 +20,12 @@ const DetailProjek = () => {
           turpis molestie, dictum est a, mattis tellus...
         </p>
         <p className="mb-8 text-base sm:text-lg leading-relaxed text-gray-600">
-          Lorem ipsum, dolor sit amet consectetur adipisicing elit. A veniam doloremque repellendus voluptas eveniet nesciunt corporis fugit, est deleniti incidunt eligendi velit facere perspiciatis iusto non eius sed quae facilis beatae assumenda consectetur unde doloribus debitis delectus! Natus minima numquam porro nobis commodi! Reiciendis quia ea autem accusantium repellendus quo!
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. A veniam
+          doloremque repellendus voluptas eveniet nesciunt corporis fugit, est
+          deleniti incidunt eligendi velit facere perspiciatis iusto non eius
+          sed quae facilis beatae assumenda consectetur unde doloribus debitis
+          delectus! Natus minima numquam porro nobis commodi! Reiciendis quia ea
+          autem accusantium repellendus quo!
         </p>
 
         <section className="bg-gray-200 rounded-xl p-6 mb-8 grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-sm sm:text-base text-gray-700">
