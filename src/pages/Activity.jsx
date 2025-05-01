@@ -1,7 +1,18 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 // Activity item component for better code organization
 const ActivityItem = ({ date, title, users, images = [] }) => {
+  async function pagedata() {
+    const response = await fetch("http://127.0.0.1:8000/api/v1/users/vendors/");
+
+    const data = await response.json();
+
+    console.log(data);
+  }
+  useEffect(() => {
+    pagedata();
+  }, []);
+
   return (
     <article className="mb-6">
       {date && (
