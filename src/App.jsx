@@ -3,48 +3,77 @@ import {
   Routes,
   Route,
   useLocation,
+  Navigate,
 } from "react-router-dom";
-import Navbar from "./components/navbar";
-import Footer from "./components/footer";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+import { authService } from "./api/apiService";
 
 import HomePage from "./pages/HomePage";
-import Projeck from "./pages/Projek";
-import Registration from "./pages/Authentication/Registration";
-import Login from "./pages/Authentication/Login";
+import Projek from "./pages/Projek";
+import Registration from "./Authentication/Registration";
+import Login from "./Authentication/Login";
 import DetailProjek from "./pages/DetailProjek";
 import ProfilePage from "./pages/Profile";
 import ActivityPage from "./pages/Activity";
+import ProfileVendor from "./pages/vendors/Profile";
+import ProfileClient from "./pages/clients/Profile"; // Fixed capitalization
+
+// PrivateRoute component with authService
+const PrivateRoute = ({ children }) => {
+  const isLoggedIn = authService.isAuthenticated();
+  return isLoggedIn ? children : <Navigate to="/login" replace />;
+};
 
 function LayoutWrapper() {
   const location = useLocation();
-  const hideNavbarRoutes = ["/register", "/login"];
-  const hideFooterRoutes = ["/register", "/login"];
+  // Routes where navbar and footer should be hidden
+  const hiddenRoutes = ["/register", "/login"];
 
   return (
     <>
-      {!hideNavbarRoutes.includes(location.pathname) && <Navbar />}
+      {!hiddenRoutes.includes(location.pathname) && <Navbar />}
 
       <Routes>
-        <Route path="/detailprojek" element={<DetailProjek />} />
         <Route path="/" element={<HomePage />} />
-        <Route path="/projeck" element={<Projeck />} />
+        <Route path="/detailprojek" element={<DetailProjek />} />
+        <Route path="/projek" element={<Projek />} />
         <Route path="/register" element={<Registration />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/activity" element={<ActivityPage />} />
+
+        {/* Profile routes */}
+        <Route path="/profile" element={
+          <PrivateRoute>
+            <ProfilePage />
+          </PrivateRoute>
+        } />
+        <Route path="/profile-vendor" element={
+          <PrivateRoute>
+            <ProfileVendor />
+          </PrivateRoute>
+        } />
+        <Route path="/profile-client" element={
+          <PrivateRoute>
+            <ProfileClient /> {/* Fixed component name */}
+          </PrivateRoute>
+        } />
+
+        <Route path="/activity" element={
+          <PrivateRoute>
+            <ActivityPage />
+          </PrivateRoute>
+        } />
       </Routes>
 
-      {!hideFooterRoutes.includes(location.pathname) && <Footer />}
+      {!hiddenRoutes.includes(location.pathname) && <Footer />}
     </>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <Router>
       <LayoutWrapper />
     </Router>
   );
 }
-
-export default App;
