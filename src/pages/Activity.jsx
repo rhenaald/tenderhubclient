@@ -1,25 +1,28 @@
 import React, { useEffect } from "react";
+import { apiClient } from "../api/apiService";
 
 // Activity item component for better code organization
 const ActivityItem = ({ date, title, users, images = [] }) => {
-  async function pagedata() {
-    const response = await fetch("http://127.0.0.1:8000/api/v1/users/vendors/");
+  const [data, setData] = React.useState([]);
 
-    const data = await response.json();
-
-    console.log(data);
+  const postdata = async () => {
+    const res = await apiClient.get("/users/profile/")
+    console.log(res.data)
+    if (res.status === 200) {
+      setData(res.data);
+    } else {
+      console.error("Error fetching data:", res.statusText);
+    }
   }
-  useEffect(() => {
-    pagedata();
-  }, []);
 
   return (
     <article className="mb-6">
       {date && (
         <div className="inline-block bg-gray-400 text-white text-xs px-3 py-1 rounded mb-1 select-none">
-          {date}
+          {data.email}
         </div>
       )}
+      <button onClick={postdata}>text</button>
       {title && (
         <h3>
           <a
@@ -282,3 +285,4 @@ const ActivityPage = () => {
 };
 
 export default ActivityPage;
+
