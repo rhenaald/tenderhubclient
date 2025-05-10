@@ -30,7 +30,7 @@ export default function TenderHubLogin() {
             if (userData && userData.access) {
                 console.log("Login berhasil");
                 // Redirect to dashboard after successful login
-                navigate("/activity");
+                navigate("/");
             } else {
                 setError("Login gagal. Silakan coba lagi.");
             }
