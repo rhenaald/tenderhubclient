@@ -172,7 +172,7 @@ const Header = () => {
             case "client":
                 return "/profile-client";
             default:
-                return "/profile";
+                return "/dashboard"; 
         }
     };
 
