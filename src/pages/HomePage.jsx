@@ -1,5 +1,6 @@
 import React from "react";
 import backgroundImage from "../assets/images/bg.png";
+import { apiClient } from "../api/apiService";
 
 const HomePage = () => {
     return (
@@ -26,7 +27,7 @@ const HomePage = () => {
             <section className="text-center px-4 sm:px-6 md:px-12">
                 <h2 className="text-2xl font-bold text-white mb-6">Popular Categories</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mx-auto">
-                {/* <div className="grid grid-cols-6 gap-6 mx-auto"> */}
+                    {/* <div className="grid grid-cols-6 gap-6 mx-auto"> */}
                     {[
                         { icon: "ri-code-line", label: "Web Development" },
                         { icon: "ri-gamepad-line", label: "Game Development" },
