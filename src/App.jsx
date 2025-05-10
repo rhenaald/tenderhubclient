@@ -17,7 +17,9 @@ import DetailProjek from "./pages/DetailProjek";
 import ProfilePage from "./pages/Profile";
 import ActivityPage from "./pages/Activity";
 import ProfileVendor from "./pages/vendors/Profile";
-import ProfileClient from "./pages/clients/Profile"; // Fixed capitalization
+import ProfileClient from "./pages/clients/Profile";
+import Dashboard from "./pages/admin/dashboard";
+import ProjectDetail from "./components/profile/client/ProjectDetail";
 
 // PrivateRoute component with authService
 const PrivateRoute = ({ children }) => {
@@ -27,7 +29,6 @@ const PrivateRoute = ({ children }) => {
 
 function LayoutWrapper() {
   const location = useLocation();
-  // Routes where navbar and footer should be hidden
   const hiddenRoutes = ["/register", "/login"];
 
   return (
@@ -36,8 +37,8 @@ function LayoutWrapper() {
 
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/detailprojek" element={<DetailProjek />} />
-        <Route path="/projek" element={<Projek />} />
+        <Route path="/projects/:id" element={<DetailProjek />} />
+        <Route path="/projects" element={<Projek />} />
         <Route path="/register" element={<Registration />} />
         <Route path="/login" element={<Login />} />
 
@@ -54,7 +55,7 @@ function LayoutWrapper() {
         } />
         <Route path="/profile-client" element={
           <PrivateRoute>
-            <ProfileClient /> {/* Fixed component name */}
+            <ProfileClient />
           </PrivateRoute>
         } />
 
@@ -63,6 +64,15 @@ function LayoutWrapper() {
             <ActivityPage />
           </PrivateRoute>
         } />
+
+        <Route path="/dashboard" element={
+          <PrivateRoute>
+            <Dashboard />
+          </PrivateRoute>
+        } />
+
+        {/* Move the ProjectDetail route inside Routes */}
+        <Route path="/ProjectDetail/:id" element={<ProjectDetail />} />
       </Routes>
 
       {!hiddenRoutes.includes(location.pathname) && <Footer />}
