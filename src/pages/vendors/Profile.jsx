@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../../api/apiService";
-import ProfileHeader from "../../components/profile/ProfileHeader";
-import ProfileEditForm from "../../components/profile/ProfileEditForm";
-import ProfileView from "../../components/profile/ProfileView";
-import ProfileTabs from "../../components/profile/ProfileTabs";
+import ProfileHeader from "../../components/profile/vendor/ProfileHeader";
+import ProfileEditForm from "../../components/profile/vendor/ProfileEditForm";
+import ProfileView from "../../components/profile/vendor/ProfileView";
+import ProfileTabs from "../../components/profile/vendor/ProfileTabs";
 
 const ProfilePage = () => {
   const [profileData, setProfileData] = useState({
@@ -144,7 +144,11 @@ const ProfilePage = () => {
   const handleDeletePortfolio = async (portfolioId) => {
     setError(null);
     try {
-      const res = await apiClient.delete(`/users/vendors/me/portfolios/${portfolioId}/`);
+      // Get the user id from profileData
+      const userId = profileData.id;
+
+      // Using the new URL format for deleting portfolio
+      const res = await apiClient.delete(`/users/vendors/me/delete_portfolio/?portfolio_id=${portfolioId}`);
 
       if (res.status === 204 || res.status === 200) {
         // Update portfolioItems state by filtering out the deleted item
