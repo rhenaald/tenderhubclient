@@ -1,61 +1,76 @@
-import React from 'react';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { apiClient } from "../../../api/apiService";
 
-const ProjectsTab = () => {
+const ActiveProjectList = () => {
+    const [projects, setProjects] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchProjects = async () => {
+            try {
+                const response = await apiClient.get("/projects/");
+                setProjects(response.data.results);
+                setLoading(false);
+            } catch (err) {
+                setError(err.message);
+                setLoading(false);
+            }
+        };
+
+        fetchProjects();
+    }, []);
+
+    if (loading) return <div className="p-4">Loading...</div>;
+    if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
+
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="font-semibold text-xl text-gray-800">Proyek Aktif</h3>
-                <button className="text-blue-500 hover:text-blue-600 flex items-center">
-                    <i className="fas fa-plus-circle mr-1"></i>
-                    Tambah Proyek
-                </button>
-            </div>
+        <div className="p-4">
+            <h2 className="text-2xl font-bold mb-6">Active Projects</h2>
 
-            <div className="space-y-4">
-                {[...Array(2)].map((_, index) => (
-                    <div
-                        key={index}
-                        className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow bg-white hover:border-blue-300"
-                    >
-                        <div className="flex items-start justify-between">
-                            <div className="flex space-x-4">
-                                <div className="bg-blue-100 p-3 rounded-full h-12 w-12 flex items-center justify-center">
-                                    <i className="fas fa-project-diagram text-blue-500 text-lg"></i>
-                                </div>
+            {projects.length === 0 ? (
+                <p>No active projects found.</p>
+            ) : (
+                <div className="space-y-4">
+                    {projects.map((project) => (
+                        <div key={project.project_id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start">
                                 <div>
-                                    <h4 className="font-semibold text-lg">Proyek {index + 1}</h4>
-                                    <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1">
-                                        <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-xs font-medium">Dalam pengerjaan</span>
-                                        <span>•</span>
-                                        <span>Deadline: 12 Hari</span>
-                                    </div>
+                                    <h3 className="font-semibold text-lg">
+                                        {project.tender_title}
+                                    </h3>
+                                    <p className="text-gray-600">
+                                        {project.client_name} (Client) - {project.vendor_name} (Vendor)
+                                    </p>
+                                    <p className="text-sm text-gray-500">
+                                        Status: <span className="capitalize">{project.status.replace('_', ' ')}</span>
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="font-medium">${project.agreed_amount}</p>
+                                    <p className="text-sm text-gray-500">
+                                        Deadline: {new Date(project.deadline).toLocaleDateString()}
+                                    </p>
                                 </div>
                             </div>
-                            <span className="font-bold text-blue-500">Rp 1.500.000</span>
-                        </div>
-
-                        <p className="text-gray-700 my-4">
-                            Deskripsi singkat proyek yang sedang dikerjakan oleh vendor. Proyek ini meliputi pembuatan desain dan pengembangan website.
-                        </p>
-
-                        <div className="flex justify-between items-center mt-4">
-                            <div className="flex items-center space-x-3">
-                                <img
-                                    src="https://via.placeholder.com/32"
-                                    alt="Vendor"
-                                    className="w-8 h-8 rounded-full"
-                                />
-                                <span className="text-sm font-medium">Dikerjakan oleh: Vendor Studio</span>
+                            <div className="mt-4 flex justify-end space-x-2">
+                                <button
+                                    onClick={() => navigate(`/Activity-projects/${project.project_id}`)}
+                                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                >
+                                    View Details
+                                </button>
+                                {/* You can add more buttons here if needed */}
                             </div>
-                            <button className="text-blue-500 hover:text-blue-600 font-medium text-sm">
-                                Lihat Detail
-                            </button>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
 
-export default ProjectsTab;
+export default ActiveProjectList;
