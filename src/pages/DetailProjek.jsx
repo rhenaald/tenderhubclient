@@ -1,63 +1,99 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiClient } from "../api/apiService";
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [similarProjects, setSimilarProjects] = useState([]);
-  const [similarLoading, setSimilarLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  // Comment state
-  const [comment, setComment] = useState("");
-  const [comments, setComments] = useState([]);
-  const [commentLoading, setCommentLoading] = useState(false);
-
-  // Bid state
   const [bidAmount, setBidAmount] = useState("");
   const [proposal, setProposal] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
-  const [bidLoading, setBidLoading] = useState(false);
   const [bidSuccess, setBidSuccess] = useState(false);
   const [bidError, setBidError] = useState(null);
+  const [userBids, setUserBids] = useState([]);
+  const [isLoadingBids, setIsLoadingBids] = useState(false);
+
+  const [comments, setComments] = useState([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(true);
+  const [newComment, setNewComment] = useState("");
+  const [commentError, setCommentError] = useState(null);
+  const [commentSuccess, setCommentSuccess] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editCommentContent, setEditCommentContent] = useState("");
+  const commentSectionRef = useRef(null);
 
   useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem('user_data'));
+    setCurrentUser(userData);
+
     const fetchProjectDetail = async () => {
       try {
-        setLoading(true);
         const response = await apiClient.get(`/tenders/${id}/`);
         setProject(response.data);
-        setLoading(false);
       } catch (err) {
         setError("Failed to fetch project details");
-        setLoading(false);
-        console.error("Error fetching project details:", err);
       }
     };
-
+    
     const fetchSimilarProjects = async () => {
       try {
-        setSimilarLoading(true);
-        // Assuming your API supports fetching similar projects by category
-        // If you have the project data already, you could use its category ID
         const response = await apiClient.get(`/tenders/?limit=3`);
         setSimilarProjects(response.data.results || []);
-        setSimilarLoading(false);
-      } catch (err) {
-        console.error("Error fetching similar projects:", err);
-        setSimilarLoading(false);
-      }
+      } catch (err) { }
     };
 
     const fetchComments = async () => {
+      setIsLoadingComments(true);
       try {
-        // Assuming there's an endpoint to fetch comments
-        const response = await apiClient.get(`/tenders/${id}/comments/`);
-        setComments(response.data || []);
+        const response = await apiClient.get(`/comments/?tender_id=${id}`);
+
+        let commentsData = [];
+        if (Array.isArray(response.data)) {
+          commentsData = response.data;
+        } else if (response.data?.results) {
+          commentsData = response.data.results;
+        } else if (response.data) {
+          commentsData = Object.values(response.data);
+        }
+
+        const transformedComments = commentsData.map(comment => ({
+          id: comment.comment_id || comment.id,
+          tender_id: comment.tender,
+          user: {
+            id: comment.user,
+            name: comment.user_name,
+            profile_picture: comment.user_picture
+          },
+          content: comment.content,
+          created_at: comment.created_at,
+          updated_at: comment.updated_at
+        }));
+
+        setComments(transformedComments);
       } catch (err) {
-        console.error("Error fetching comments:", err);
+        setComments([]);
+      } finally {
+        setIsLoadingComments(false);
+      }
+    };
+
+    const fetchUserBids = async () => {
+      if (!userData) return;
+
+      setIsLoadingBids(true);
+      try {
+        const response = await apiClient.get(`/bids/?tender_id=${id}`);
+        const filteredBids = response.data.results.filter(bid => bid.tender == id);
+
+        setUserBids(filteredBids || []);
+      } catch (err) {
+        console.error("Error fetching bids:", err);
+      } finally {
+        setIsLoadingBids(false);
       }
     };
 
@@ -65,6 +101,7 @@ export default function ProjectDetail() {
       fetchProjectDetail();
       fetchSimilarProjects();
       fetchComments();
+      fetchUserBids();
     }
   }, [id]);
 
@@ -76,28 +113,16 @@ export default function ProjectDetail() {
     });
   };
 
-  // Add comment function
-  const handleAddComment = async (e) => {
-    e.preventDefault();
-    if (!comment.trim()) return;
-
-    setCommentLoading(true);
-    try {
-      const response = await apiClient.post(`/tenders/${id}/add_comment/`, {
-        content: comment
-      });
-
-      // Add the new comment to the comments list
-      setComments([...comments, response.data]);
-      setComment(""); // Clear the input
-      setCommentLoading(false);
-    } catch (err) {
-      console.error("Error adding comment:", err);
-      setCommentLoading(false);
-    }
+  const formatDateTime = (dateString) => {
+    return new Date(dateString).toLocaleString("id-ID", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
-  // Place bid function
   const handlePlaceBid = async (e) => {
     e.preventDefault();
 
@@ -106,7 +131,6 @@ export default function ProjectDetail() {
       return;
     }
 
-    setBidLoading(true);
     setBidError(null);
 
     try {
@@ -117,44 +141,134 @@ export default function ProjectDetail() {
       });
 
       setBidSuccess(true);
-      setBidLoading(false);
-
-      // Reset form
       setBidAmount("");
       setProposal("");
       setDeliveryTime("");
 
-      // After 3 seconds, hide success message
+      const userData = JSON.parse(localStorage.getItem('user_data'));
+      const response = await apiClient.get(`/bids/?tender_id=${id}&user_id=${userData.id}`);
+      setUserBids(response.data.results || response.data || []);
+
       setTimeout(() => {
         setBidSuccess(false);
       }, 3000);
     } catch (err) {
-      console.error("Error placing bid:", err);
       setBidError(err.response?.data?.message || "Failed to place bid. Please try again.");
-      setBidLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16">
-        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 animate-pulse">
-          <div className="bg-gray-300 h-8 w-2/3 rounded mb-6"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="md:col-span-2">
-              <div className="bg-gray-300 h-64 w-full rounded-xl mb-6"></div>
-              <div className="space-y-4">
-                <div className="bg-gray-300 h-6 w-full rounded"></div>
-                <div className="bg-gray-300 h-6 w-5/6 rounded"></div>
-                <div className="bg-gray-300 h-6 w-4/6 rounded"></div>
-              </div>
-            </div>
-            <div className="bg-gray-100 rounded-xl p-6 h-96"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+
+    if (!newComment.trim()) {
+      setCommentError("Comment cannot be empty");
+      return;
+    }
+
+    setCommentError(null);
+
+    try {
+      const response = await apiClient.post(`/comments/`, {
+        tender_id: Number(id),
+        content: newComment
+      });
+
+      const newCommentData = {
+        id: response.data.comment_id || response.data.id,
+        tender_id: response.data.tender,
+        user: {
+          id: currentUser.id,
+          name: currentUser.name || currentUser.username,
+          profile_picture: currentUser.profile_picture
+        },
+        content: response.data.content,
+        created_at: response.data.created_at,
+        updated_at: response.data.updated_at
+      };
+
+      setComments(prevComments => [newCommentData, ...prevComments]);
+      setNewComment("");
+      setCommentSuccess(true);
+
+      setTimeout(() => {
+        setCommentSuccess(false);
+      }, 3000);
+    } catch (err) {
+      setCommentError(err.response?.data?.message || "Failed to add comment. Please try again.");
+    }
+  };
+
+  const handleEditComment = async (commentId) => {
+    if (!editCommentContent.trim()) {
+      setCommentError("Comment cannot be empty");
+      return;
+    }
+
+    setCommentError(null);
+
+    try {
+      const response = await apiClient.put(`/comments/${commentId}/`, {
+        content: editCommentContent
+      });
+
+      setComments(prevComments =>
+        prevComments.map(comment =>
+          comment.id === commentId ? {
+            ...comment,
+            content: response.data.content,
+            updated_at: response.data.updated_at
+          } : comment
+        )
+      );
+
+      setEditingCommentId(null);
+      setEditCommentContent("");
+      setCommentSuccess(true);
+
+      setTimeout(() => {
+        setCommentSuccess(false);
+      }, 3000);
+    } catch (err) {
+      setCommentError(err.response?.data?.message || "Failed to update comment. Please try again.");
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Are you sure you want to delete this comment?")) {
+      return;
+    }
+
+    try {
+      await apiClient.delete(`/comments/${commentId}/`);
+
+      setComments(prevComments =>
+        prevComments.filter(comment => comment.id !== commentId)
+      );
+
+      setCommentSuccess(true);
+      setTimeout(() => {
+        setCommentSuccess(false);
+      }, 3000);
+    } catch (err) {
+      setCommentError(err.response?.data?.message || "Failed to delete comment. Please try again.");
+    }
+  };
+
+  const handleStartEdit = (comment) => {
+    setEditingCommentId(comment.id);
+    setEditCommentContent(comment.content);
+
+    setTimeout(() => {
+      if (commentSectionRef.current) {
+        commentSectionRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
+
+  const cancelEdit = () => {
+    setEditingCommentId(null);
+    setEditCommentContent("");
+  };
 
   if (error) {
     return (
@@ -176,9 +290,11 @@ export default function ProjectDetail() {
     );
   }
 
+  const isClient = currentUser && currentUser.id === project.client;
+  const isFreelancer = currentUser && currentUser.user_type === 'vendor';
+
   return (
     <>
-      {/* BREADCRUMB */}
       <div className="bg-gray-100 py-4">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <nav className="text-sm">
@@ -194,10 +310,8 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
         <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-          {/* PROJECT STATUS */}
           <div className="mb-6">
             <span className="bg-green-500 text-white text-xs sm:text-sm font-semibold px-3 py-1 rounded-full">
               {project.status}
@@ -208,15 +322,12 @@ export default function ProjectDetail() {
             {project.title}
           </h1>
 
-          {/* CREATION DATE - Now below title */}
           <div className="mb-6 text-gray-600 text-sm">
             Posted on {formatDate(project.created_at)}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* LEFT COLUMN - PROJECT DETAILS */}
             <div className="md:col-span-2">
-              {/* PROJECT IMAGE */}
               <div className="bg-gradient-to-r from-[#5B8CFF] to-[#7DA7FF] rounded-xl h-64 mb-6 flex items-center justify-center">
                 {project.attachment ? (
                   <img
@@ -229,13 +340,14 @@ export default function ProjectDetail() {
                 )}
               </div>
 
-              {/* CLIENT INFO */}
               <div className="flex items-center space-x-3 mb-6 bg-gray-50 p-4 rounded-xl">
-                <img
-                  src={`http://127.0.0.1:8000${project.client_picture}`}
-                  alt={project.client_name}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
+                <Link to={`/client/profile/${project.client}`}>
+                  <img
+                    src={`http://127.0.0.1:8000${project.client_picture}`}
+                    alt={project.client_name}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                </Link>
                 <div>
                   <h3 className="font-semibold text-gray-800">
                     {project.client_name}
@@ -244,7 +356,6 @@ export default function ProjectDetail() {
                 </div>
               </div>
 
-              {/* PROJECT DESCRIPTION */}
               <div className="mb-8">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">
                   Project Description
@@ -254,7 +365,6 @@ export default function ProjectDetail() {
                 </div>
               </div>
 
-              {/* PROJECT REQUIREMENTS - Display only if available */}
               {project.requirements && (
                 <div className="mb-8">
                   <h2 className="text-xl font-bold text-gray-800 mb-4">
@@ -269,7 +379,6 @@ export default function ProjectDetail() {
                 </div>
               )}
 
-              {/* PROJECT DURATION */}
               <div className="mb-8">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">
                   Project Duration
@@ -279,156 +388,266 @@ export default function ProjectDetail() {
                 </p>
               </div>
 
-              {/* COMMENTS SECTION */}
-              <div className="mb-8">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">
-                  Comments
-                </h2>
+              {isFreelancer && (
+                <div className="mb-8 bg-gray-50 p-6 rounded-xl">
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">
+                    Your Bids
+                  </h2>
 
-                {/* Comments List */}
-                <div className="space-y-4 mb-6">
-                  {comments.length > 0 ? (
-                    comments.map((comment, index) => (
-                      <div key={index} className="bg-gray-50 p-4 rounded-xl">
-                        <div className="flex items-center mb-2">
-                          <img
-                            src={comment.user_avatar || "https://via.placeholder.com/40"}
-                            alt={comment.user_name}
-                            className="w-8 h-8 rounded-full mr-2"
-                          />
+                  {isLoadingBids ? (
+                    <p className="text-gray-500">Loading your bids...</p>
+                  ) : userBids.length > 0 ? (
+                    <div className="space-y-4">
+                        {userBids.map((bid) => (
+                          <div key={bid.bid_id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h4 className="font-semibold text-gray-800">
+                                  Bid Amount: Rp {Number(bid.amount).toLocaleString()}
+                                </h4>
+                                <p className="text-sm text-gray-500">
+                                  Delivery Time: {bid.delivery_time} days
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Submitted on {formatDateTime(bid.created_at)}
+                                </p>
+                              </div>
+                              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${bid.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                  bid.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                    'bg-blue-100 text-blue-800'
+                                }`}>
+                                {bid.status}
+                              </span>
+                            </div>
+                            <div className="mt-2">
+                              <h5 className="text-sm font-medium text-gray-700">Proposal:</h5>
+                              <p className="text-gray-600 whitespace-pre-wrap">{bid.proposal}</p>
+                            </div>
+                            <div className="mt-2 flex items-center">
+                              <img
+                                src={bid.vendor_profile?.profile_picture ? `http://127.0.0.1:8000${bid.vendor_profile.profile_picture}` : "https://via.placeholder.com/40"}
+                                alt={bid.vendor_name}
+                                className="w-6 h-6 rounded-full mr-2"
+                              />
+                              <span className="text-sm text-gray-600">{bid.vendor_name}</span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mb-6">
+                        <p className="text-gray-600">You haven't placed any bids on this project yet.</p>
+                      </div>
+
+                      <h3 className="text-lg font-bold text-gray-800 mb-4">
+                        Place Your Bid
+                      </h3>
+
+                      {bidSuccess && (
+                        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md mb-4">
+                          Your bid has been successfully submitted!
+                        </div>
+                      )}
+
+                      {bidError && (
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md mb-4">
+                          {bidError}
+                        </div>
+                      )}
+
+                      <form onSubmit={handlePlaceBid}>
+                        <div className="space-y-4">
                           <div>
-                            <p className="font-semibold text-sm">{comment.user_name}</p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(comment.created_at).toLocaleDateString()}
+                            <label htmlFor="bidAmount" className="block text-gray-700 font-medium mb-1">
+                              Your Bid Amount (Rp)
+                            </label>
+                            <input
+                              type="number"
+                              id="bidAmount"
+                              className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5B8CFF]"
+                              placeholder="Enter your bid amount"
+                              value={bidAmount}
+                              onChange={(e) => setBidAmount(e.target.value)}
+                              min={project.min_budget}
+                              max={project.max_budget}
+                              required
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Budget Range: Rp {Number(project.min_budget).toLocaleString()} - Rp {Number(project.max_budget).toLocaleString()}
                             </p>
                           </div>
+
+                          <div>
+                            <label htmlFor="deliveryTime" className="block text-gray-700 font-medium mb-1">
+                              Delivery Time (Days)
+                            </label>
+                            <input
+                              type="number"
+                              id="deliveryTime"
+                              className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5B8CFF]"
+                              placeholder="Enter delivery time in days"
+                              value={deliveryTime}
+                              onChange={(e) => setDeliveryTime(e.target.value)}
+                              min="1"
+                              max={project.max_duration}
+                              required
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Maximum allowed: {project.max_duration} days
+                            </p>
+                          </div>
+
+                          <div>
+                            <label htmlFor="proposal" className="block text-gray-700 font-medium mb-1">
+                              Your Proposal
+                            </label>
+                            <textarea
+                              id="proposal"
+                              className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5B8CFF] resize-none"
+                              rows="5"
+                              placeholder="Describe why you're the best fit for this project"
+                              value={proposal}
+                              onChange={(e) => setProposal(e.target.value)}
+                              required
+                            ></textarea>
+                          </div>
+
+                          <button
+                            type="submit"
+                            className="w-full bg-gradient-to-r from-[#5B8CFF] to-[#7DA7FF] text-white py-3 rounded-xl font-bold hover:shadow-lg transition duration-300"
+                          >
+                            Submit Bid
+                          </button>
                         </div>
-                        <p className="text-gray-700 text-sm">{comment.content}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 italic">No comments yet. Be the first to comment!</p>
+                      </form>
+                    </>
                   )}
                 </div>
+              )}
 
-                {/* Add Comment Form */}
-                <form onSubmit={handleAddComment}>
-                  <div className="flex flex-col space-y-2">
-                    <textarea
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5B8CFF] resize-none"
-                      rows="3"
-                      placeholder="Add a comment..."
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      required
-                    ></textarea>
-                    <div className="text-right">
-                      <button
-                        type="submit"
-                        className="bg-[#5B8CFF] text-white px-4 py-2 rounded-xl font-medium hover:bg-[#4A7AE5] transition duration-300 disabled:opacity-50"
-                        disabled={commentLoading || !comment.trim()}
-                      >
-                        {commentLoading ? "Posting..." : "Post Comment"}
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-
-              {/* BID FORM SECTION */}
-              <div className="mb-8 bg-gray-50 p-6 rounded-xl">
+              <div className="mb-8 bg-gray-50 p-6 rounded-xl" ref={commentSectionRef}>
                 <h2 className="text-xl font-bold text-gray-800 mb-4">
-                  Place Your Bid
+                  {editingCommentId ? "Edit Comment" : "Comments"}
                 </h2>
 
-                {bidSuccess && (
+                {commentSuccess && (
                   <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md mb-4">
-                    Your bid has been successfully submitted!
+                    {editingCommentId ? "Comment updated successfully!" : "Comment added successfully!"}
                   </div>
                 )}
 
-                {bidError && (
+                {commentError && (
                   <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md mb-4">
-                    {bidError}
+                    {commentError}
                   </div>
                 )}
 
-                <form onSubmit={handlePlaceBid}>
+                <form onSubmit={editingCommentId ?
+                  (e) => { e.preventDefault(); handleEditComment(editingCommentId); } :
+                  handleAddComment
+                } className="mb-6">
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="bidAmount" className="block text-gray-700 font-medium mb-1">
-                        Your Bid Amount (Rp)
-                      </label>
-                      <input
-                        type="number"
-                        id="bidAmount"
-                        className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5B8CFF]"
-                        placeholder="Enter your bid amount"
-                        value={bidAmount}
-                        onChange={(e) => setBidAmount(e.target.value)}
-                        min={project.min_budget}
-                        max={project.max_budget}
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Budget Range: Rp {Number(project.min_budget).toLocaleString()} - Rp {Number(project.max_budget).toLocaleString()}
-                      </p>
-                    </div>
-
-                    <div>
-                      <label htmlFor="deliveryTime" className="block text-gray-700 font-medium mb-1">
-                        Delivery Time (Days)
-                      </label>
-                      <input
-                        type="number"
-                        id="deliveryTime"
-                        className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5B8CFF]"
-                        placeholder="Enter delivery time in days"
-                        value={deliveryTime}
-                        onChange={(e) => setDeliveryTime(e.target.value)}
-                        min="1"
-                        max={project.max_duration}
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Maximum allowed: {project.max_duration} days
-                      </p>
-                    </div>
-
-                    <div>
-                      <label htmlFor="proposal" className="block text-gray-700 font-medium mb-1">
-                        Your Proposal
+                      <label htmlFor="comment" className="block text-gray-700 font-medium mb-1">
+                        {editingCommentId ? "Update your comment" : "Add a comment"}
                       </label>
                       <textarea
-                        id="proposal"
+                        id="comment"
                         className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5B8CFF] resize-none"
-                        rows="5"
-                        placeholder="Describe why you're the best fit for this project"
-                        value={proposal}
-                        onChange={(e) => setProposal(e.target.value)}
+                        rows="3"
+                        placeholder={editingCommentId ? "Edit your comment..." : "Write a comment..."}
+                        value={editingCommentId ? editCommentContent : newComment}
+                        onChange={(e) => editingCommentId ?
+                          setEditCommentContent(e.target.value) :
+                          setNewComment(e.target.value)
+                        }
                         required
                       ></textarea>
                     </div>
 
-                    <button
-                      type="submit"
-                      className="w-full bg-gradient-to-r from-[#5B8CFF] to-[#7DA7FF] text-white py-3 rounded-xl font-bold hover:shadow-lg transition duration-300 disabled:opacity-50"
-                      disabled={bidLoading}
-                    >
-                      {bidLoading ? "Submitting..." : "Submit Bid"}
-                    </button>
+                    <div className="flex space-x-3">
+                      <button
+                        type="submit"
+                        className="bg-gradient-to-r from-[#5B8CFF] to-[#7DA7FF] text-white py-2 px-6 rounded-xl font-bold hover:shadow-lg transition duration-300"
+                      >
+                        {editingCommentId ? "Update Comment" : "Post Comment"}
+                      </button>
+
+                      {editingCommentId && (
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="bg-gray-200 text-gray-700 py-2 px-6 rounded-xl font-bold hover:shadow-lg transition duration-300"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </form>
+
+                <div className="space-y-4">
+                  {isLoadingComments ? (
+                    <p className="text-gray-500">Loading comments...</p>
+                  ) : comments.length === 0 ? (
+                    <p className="text-gray-500 italic">No comments yet. Be the first to comment!</p>
+                  ) : (
+                    comments.map((comment) => (
+                      <div key={comment.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center">
+                            <Link to={comment.user?.user_type === 'vendor'
+                              ? `/vendor/profile/${comment.user.id}`
+                              : `/client/profile/${comment.user.id}`}
+                            >
+                              <img
+                                src={comment.user?.profile_picture ? `http://127.0.0.1:8000${comment.user.profile_picture}` : "https://via.placeholder.com/40"}
+                                alt={comment.user?.name || comment.user?.user_name || "User"}
+                                className="w-8 h-8 rounded-full object-cover mr-3"
+                              />
+                            </Link>
+                            <div>
+                              <h4 className="font-semibold text-gray-800">
+                                {comment.user?.name || comment.user?.user_name || "Anonymous"}
+                              </h4>
+                              <p className="text-xs text-gray-500">
+                                {formatDateTime(comment.created_at)}
+                                {comment.created_at !== comment.updated_at && " (edited)"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {currentUser && comment.user?.id === currentUser.id && (
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => handleStartEdit(comment)}
+                                className="text-[#5B8CFF] hover:underline text-sm"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteComment(comment.id)}
+                                className="text-red-500 hover:underline text-sm"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* RIGHT COLUMN - APPLICATION BOX */}
             <div className="bg-gray-50 rounded-xl p-6 h-fit sticky top-8">
               <h3 className="font-bold text-lg text-gray-800 mb-4">
                 Project Details
               </h3>
 
-              {/* BUDGET */}
               <div className="mb-4 pb-4 border-b border-gray-200">
                 <p className="text-gray-600 text-sm mb-1">Budget</p>
                 <p className="font-bold text-gray-800">
@@ -437,7 +656,6 @@ export default function ProjectDetail() {
                 </p>
               </div>
 
-              {/* DEADLINE */}
               <div className="mb-4 pb-4 border-b border-gray-200">
                 <p className="text-gray-600 text-sm mb-1">Deadline</p>
                 <p className="font-bold text-gray-800">
@@ -445,7 +663,6 @@ export default function ProjectDetail() {
                 </p>
               </div>
 
-              {/* CATEGORY */}
               <div className="mb-4 pb-4 border-b border-gray-200">
                 <p className="text-gray-600 text-sm mb-1">Category</p>
                 <div className="mt-1">
@@ -457,7 +674,6 @@ export default function ProjectDetail() {
                 </div>
               </div>
 
-              {/* TAGS */}
               {project.tags && project.tags.length > 0 && (
                 <div className="mb-6 pb-4 border-b border-gray-200">
                   <p className="text-gray-600 text-sm mb-1">Tags</p>
@@ -474,51 +690,27 @@ export default function ProjectDetail() {
                 </div>
               )}
 
-              {/* APPLY BUTTON */}
-              <button className="w-full bg-gradient-to-r from-[#5B8CFF] to-[#7DA7FF] text-white py-3 rounded-xl font-bold hover:shadow-lg transition duration-300">
-                Apply Now
-              </button>
+              <div className="mb-4">
+                <p className="text-gray-600 text-sm mb-1">Comments</p>
+                <p className="font-bold text-gray-800">{comments.length}</p>
+              </div>
 
-              {/* SAVE PROJECT */}
-              <button className="w-full mt-3 border-2 border-[#5B8CFF] text-[#5B8CFF] py-3 rounded-xl font-bold hover:bg-gray-100 transition duration-300 flex items-center justify-center">
-                <i className="far fa-bookmark mr-2"></i>
-                Save Project
-              </button>
+              {isFreelancer && (
+                <div className="mb-4">
+                  <p className="text-gray-600 text-sm mb-1">Your Bids</p>
+                  <p className="font-bold text-gray-800">{userBids.length}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* SIMILAR PROJECTS */}
         <section className="mt-12">
           <h2 className="font-extrabold text-xl mb-6 text-[#5B8CFF]">
             Similar Projects
           </h2>
 
-          {similarLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {Array(3)
-                .fill()
-                .map((_, i) => (
-                  <div
-                    key={i}
-                    className="bg-white rounded-xl shadow-md overflow-hidden animate-pulse"
-                  >
-                    <div className="bg-gray-300 h-36 w-full"></div>
-                    <div className="p-4">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <div className="bg-gray-300 rounded-full w-6 h-6"></div>
-                        <div className="bg-gray-300 h-4 w-24 rounded"></div>
-                      </div>
-                      <div className="bg-gray-300 h-4 w-full rounded mb-2"></div>
-                      <div className="bg-gray-300 h-4 w-3/4 rounded mb-2"></div>
-                      <div className="mt-4">
-                        <div className="bg-gray-300 h-6 w-20 rounded-full"></div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          ) : similarProjects.length === 0 ? (
+          {similarProjects.length === 0 ? (
             <div className="bg-yellow-50 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-md">
               No similar projects available at the moment.
             </div>
@@ -527,12 +719,10 @@ export default function ProjectDetail() {
               {similarProjects.map((project) => (
                 <Link to={`/projects/${project.tender_id}`} key={project.tender_id}>
                   <article className="relative bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition duration-300">
-                    {/* Status Tag */}
                     <span className="absolute top-2 right-2 bg-green-500 text-white text-xs sm:text-sm font-semibold px-3 py-1 rounded-full z-10 shadow">
                       {project.status}
                     </span>
 
-                    {/* Project Image */}
                     <div className="bg-gradient-to-r from-[#5B8CFF] to-[#7DA7FF] h-36">
                       {project.attachment ? (
                         <img
@@ -571,7 +761,6 @@ export default function ProjectDetail() {
                         </span>
                       </p>
 
-                      {/* CATEGORY TAGS */}
                       <div className="mt-4 flex flex-wrap gap-2">
                         {project.category && (
                           <span className="bg-[#5B8CFF] text-white text-xs sm:text-sm font-medium rounded-full py-1 px-3">
