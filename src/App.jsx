@@ -20,6 +20,8 @@ import ProfileVendor from "./pages/vendors/Profile";
 import ProfileClient from "./pages/clients/Profile";
 import Dashboard from "./pages/admin/dashboard";
 import ProjectDetail from "./components/profile/client/ProjectDetail";
+import Activity from "./components/profile/client/Activity";
+import ActiveProjectDetail from "./components/profile/client/ActiveProject";
 
 // PrivateRoute component with authService
 const PrivateRoute = ({ children }) => {
@@ -70,7 +72,11 @@ function LayoutWrapper() {
             <Dashboard />
           </PrivateRoute>
         } />
+        {/* <Route path="/vendor/profile/:id" element={<VendorProfile />} />
+        <Route path="/client/profile/:id" element={<ClientProfile />} /> */}
 
+        <Route path="/Activity-projects/:id" element={<ActiveProjectDetail />} />
+        <Route path="/History/:id" element={<Activity />} />
         {/* Move the ProjectDetail route inside Routes */}
         <Route path="/ProjectDetail/:id" element={<ProjectDetail />} />
       </Routes>
