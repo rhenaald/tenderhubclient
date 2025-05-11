@@ -1,33 +1,34 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiClient } from "../../../api/apiService";
-import { FiArrowLeft, FiExternalLink, FiClock, FiDollarSign, FiCalendar, FiTag, FiUser, FiMessageCircle, FiCheckCircle } from "react-icons/fi";
+import { FiArrowLeft, FiExternalLink, FiClock, FiDollarSign, FiCalendar, FiTag, FiUser, FiCheckCircle, FiEdit2, FiTrash2, FiMessageCircle, FiSend } from "react-icons/fi";
 
 const ProjectDetail = () => {
     const { id } = useParams();
     const [project, setProject] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [proposals, setProposals] = useState([]);
-    const [loadingProposals, setLoadingProposals] = useState(false);
-    const [comment, setComment] = useState("");
-    const [comments, setComments] = useState([]);
-    const [loadingComments, setLoadingComments] = useState(false);
-    const [submittingComment, setSubmittingComment] = useState(false);
     const [acceptingBid, setAcceptingBid] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
+    const [currentUser, setCurrentUser] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState("");
+    const [editingComment, setEditingComment] = useState(null);
+    const [editContent, setEditContent] = useState("");
+    const commentInputRef = useRef(null);
+
+    useEffect(() => {
+        const userData = JSON.parse(localStorage.getItem('user_data'));
+        setCurrentUser(userData);
+    }, []);
 
     useEffect(() => {
         const fetchProjectData = async () => {
             try {
-                setLoading(true);
                 const response = await apiClient.get(`/tenders/${id}/`);
                 setProject(response.data);
             } catch (error) {
-                console.error("Error fetching project details:", error);
                 setError("Gagal memuat detail proyek");
-            } finally {
-                setLoading(false);
             }
         };
 
@@ -39,16 +40,12 @@ const ProjectDetail = () => {
             if (!project) return;
 
             try {
-                setLoadingProposals(true);
                 const response = await apiClient.get(`/bids/`);
-                // Filter bids for this tender
                 const filteredBids = (response.data?.results || response.data || [])
                     .filter(bid => bid.tender == id);
                 setProposals(filteredBids);
             } catch (error) {
                 console.error("Error fetching proposals:", error);
-            } finally {
-                setLoadingProposals(false);
             }
         };
 
@@ -57,21 +54,21 @@ const ProjectDetail = () => {
 
     useEffect(() => {
         const fetchComments = async () => {
-            if (!project) return;
-
             try {
-                setLoadingComments(true);
-                const response = await apiClient.get(`/tenders/${id}/comments/`);
-                setComments(response.data?.results || response.data || []);
+                const response = await apiClient.get(`/comments/`, {
+                    params: { tender_id: id }
+                });
+                const commentsData = response.data?.results || response.data || [];
+                setComments(commentsData);
             } catch (error) {
                 console.error("Error fetching comments:", error);
-            } finally {
-                setLoadingComments(false);
             }
         };
 
-        fetchComments();
-    }, [id, project]);
+        if (id) {
+            fetchComments();
+        }
+    }, [id]);
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('id-ID', {
@@ -88,6 +85,18 @@ const ProjectDetail = () => {
             day: 'numeric',
             month: 'long',
             year: 'numeric'
+        }).format(date);
+    };
+
+    const formatDateTime = (dateString) => {
+        if (!dateString) return "-";
+        const date = new Date(dateString);
+        return new Intl.DateTimeFormat('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
         }).format(date);
     };
 
@@ -111,31 +120,6 @@ const ProjectDetail = () => {
         }
     };
 
-    const handleSubmitComment = async (e) => {
-        e.preventDefault();
-        if (!comment.trim()) return;
-
-        try {
-            setSubmittingComment(true);
-            await apiClient.post(`tenders/${id}/add_comment/`, {
-                comment: comment.trim()
-            });
-
-            // Refresh comments
-            const response = await apiClient.get(`/tenders/${id}/comments/`);
-            setComments(response.data?.results || response.data || []);
-            setComment("");
-
-            // Show temporary success message
-            setSuccessMessage("Komentar berhasil ditambahkan");
-            setTimeout(() => setSuccessMessage(""), 3000);
-        } catch (error) {
-            console.error("Error submitting comment:", error);
-        } finally {
-            setSubmittingComment(false);
-        }
-    };
-
     const handleAcceptBid = async (bidId) => {
         if (!window.confirm("Apakah Anda yakin ingin menerima proposal ini? Tindakan ini tidak dapat dibatalkan.")) {
             return;
@@ -147,11 +131,9 @@ const ProjectDetail = () => {
                 bid_id: bidId
             });
 
-            // Update project status
             const updatedProject = { ...project, status: 'closed' };
             setProject(updatedProject);
 
-            // Update the bid status in the proposals array
             const updatedProposals = proposals.map(prop =>
                 prop.bid_id === bidId
                     ? { ...prop, status: 'accepted' }
@@ -159,7 +141,6 @@ const ProjectDetail = () => {
             );
             setProposals(updatedProposals);
 
-            // Show temporary success message
             setSuccessMessage("Proposal berhasil diterima dan proyek telah dibuat");
             setTimeout(() => setSuccessMessage(""), 3000);
         } catch (error) {
@@ -169,13 +150,77 @@ const ProjectDetail = () => {
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center h-48">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#5B8CFF]"></div>
-            </div>
-        );
-    }
+    const handleAddComment = async (e) => {
+        e.preventDefault();
+        if (!newComment.trim()) return;
+
+        try {
+            const response = await apiClient.post(`/comments/`, {
+                tender_id: parseInt(id),
+                content: newComment.trim()
+            });
+
+            setComments([...comments, response.data]);
+            setNewComment("");
+            setSuccessMessage("Komentar berhasil ditambahkan");
+            setTimeout(() => setSuccessMessage(""), 3000);
+        } catch (error) {
+            console.error("Error adding comment:", error);
+        }
+    };
+
+    const handleEditComment = async (commentId) => {
+        if (!editContent.trim()) return;
+
+        try {
+            await apiClient.put(`/comments/${commentId}/`, {
+                content: editContent
+            });
+
+            const updatedComments = comments.map(comment =>
+                comment.comment_id === commentId ? { ...comment, content: editContent } : comment
+            );
+
+            setComments(updatedComments);
+            setEditingComment(null);
+            setEditContent("");
+            setSuccessMessage("Komentar berhasil diperbarui");
+            setTimeout(() => setSuccessMessage(""), 3000);
+        } catch (error) {
+            console.error("Error updating comment:", error);
+        }
+    };
+
+    const handleDeleteComment = async (commentId) => {
+        if (!window.confirm("Apakah Anda yakin ingin menghapus komentar ini?")) {
+            return;
+        }
+
+        try {
+            await apiClient.delete(`/comments/${commentId}/`);
+            const updatedComments = comments.filter(comment => comment.comment_id !== commentId);
+            setComments(updatedComments);
+            setSuccessMessage("Komentar berhasil dihapus");
+            setTimeout(() => setSuccessMessage(""), 3000);
+        } catch (error) {
+            console.error("Error deleting comment:", error);
+        }
+    };
+
+    const startEditing = (comment) => {
+        setEditingComment(comment.comment_id);
+        setEditContent(comment.content);
+        setTimeout(() => {
+            if (commentInputRef.current) {
+                commentInputRef.current.focus();
+            }
+        }, 0);
+    };
+
+    const cancelEditing = () => {
+        setEditingComment(null);
+        setEditContent("");
+    };
 
     if (error || !project) {
         return (
@@ -219,7 +264,6 @@ const ProjectDetail = () => {
                     Kembali ke daftar proyek
                 </Link>
 
-                {/* Project Header */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     {project.attachment && (
                         <div className="relative h-64 bg-gradient-to-r from-blue-500 to-blue-600">
@@ -289,122 +333,15 @@ const ProjectDetail = () => {
                 </div>
             </div>
 
-            {/* Project Details */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="p-6 sm:p-8">
                             <h2 className="text-xl font-bold text-gray-900 mb-6 pb-4 border-b border-gray-100">Detail Proyek</h2>
-
                             <div className="prose prose-blue max-w-none">
                                 <h3 className="text-lg font-semibold text-gray-800 mb-3">Deskripsi Proyek</h3>
                                 <p className="text-gray-700 whitespace-pre-line">{project.description}</p>
                             </div>
-
-                            {project.tags?.length > 0 && (
-                                <div className="mt-8">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-3">Keterampilan yang Dibutuhkan</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {project.tags.map((tag, idx) => (
-                                            <span key={idx} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                {typeof tag === 'object' ? tag.name : tag}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Comments Section */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mt-8">
-                        <div className="p-6 sm:p-8">
-                            <h2 className="text-xl font-bold text-gray-900 mb-6 pb-4 border-b border-gray-100">
-                                <div className="flex items-center">
-                                    <FiMessageCircle className="mr-2" />
-                                    <span>Komentar</span>
-                                </div>
-                            </h2>
-
-                            {loadingComments ? (
-                                <div className="flex justify-center py-6">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#5B8CFF]"></div>
-                                </div>
-                            ) : (
-                                <div className="space-y-6">
-                                    {comments.length > 0 ? (
-                                        comments.map((comment, idx) => (
-                                            <div key={idx} className="flex space-x-4">
-                                                <div className="flex-shrink-0">
-                                                    {comment.user_picture ? (
-                                                        <img
-                                                            src={comment.user_picture}
-                                                            alt={comment.user_name}
-                                                            className="h-10 w-10 rounded-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
-                                                            {comment.user_name?.charAt(0).toUpperCase() || "U"}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="bg-gray-50 rounded-lg p-4">
-                                                        <div className="flex justify-between items-start">
-                                                            <h4 className="font-medium text-gray-900">{comment.user_name}</h4>
-                                                            <span className="text-xs text-gray-500">{formatDate(comment.created_at)}</span>
-                                                        </div>
-                                                        <p className="mt-2 text-gray-700">{comment.comment}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-gray-500 text-center py-4">Belum ada komentar</p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Add Comment Form */}
-                            <form onSubmit={handleSubmitComment} className="mt-6 pt-6 border-t border-gray-100">
-                                <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">
-                                    Tambahkan komentar
-                                </label>
-                                <div className="flex">
-                                    <textarea
-                                        id="comment"
-                                        name="comment"
-                                        rows="3"
-                                        className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border border-gray-300 rounded-md"
-                                        placeholder="Tulis komentar Anda di sini..."
-                                        value={comment}
-                                        onChange={(e) => setComment(e.target.value)}
-                                        disabled={submittingComment}
-                                    ></textarea>
-                                </div>
-                                <div className="mt-2 flex justify-end">
-                                    <button
-                                        type="submit"
-                                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                                        disabled={!comment.trim() || submittingComment}
-                                    >
-                                        {submittingComment ? (
-                                            <>
-                                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                                <span>Mengirim...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FiMessageCircle className="mr-2" />
-                                                <span>Kirim Komentar</span>
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </form>
                         </div>
                     </div>
                 </div>
@@ -413,7 +350,6 @@ const ProjectDetail = () => {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden sticky top-6">
                         <div className="p-6 sm:p-8">
                             <h2 className="text-xl font-bold text-gray-900 mb-6 pb-4 border-b border-gray-100">Informasi</h2>
-
                             <div className="space-y-5">
                                 <div>
                                     <div className="flex items-center text-sm text-gray-500 mb-1">
@@ -422,7 +358,6 @@ const ProjectDetail = () => {
                                     </div>
                                     <p className="text-gray-900 font-medium">{formatDate(project.deadline)}</p>
                                 </div>
-
                                 <div>
                                     <div className="flex items-center text-sm text-gray-500 mb-1">
                                         <FiCalendar className="mr-2" />
@@ -430,13 +365,19 @@ const ProjectDetail = () => {
                                     </div>
                                     <p className="text-gray-900 font-medium">{formatDate(project.created_at)}</p>
                                 </div>
-
                                 <div>
                                     <div className="flex items-center text-sm text-gray-500 mb-1">
                                         <FiTag className="mr-2" />
                                         <span>Jumlah Proposal</span>
                                     </div>
                                     <p className="text-gray-900 font-medium">{project.bid_count || 0} proposal</p>
+                                </div>
+                                <div>
+                                    <div className="flex items-center text-sm text-gray-500 mb-1">
+                                        <FiMessageCircle className="mr-2" />
+                                        <span>Jumlah Komentar</span>
+                                    </div>
+                                    <p className="text-gray-900 font-medium">{comments.length} komentar</p>
                                 </div>
                             </div>
                         </div>
@@ -451,7 +392,6 @@ const ProjectDetail = () => {
                             <h2 className="text-xl font-bold text-gray-900 mb-6 pb-4 border-b border-gray-100">
                                 Proposal ({proposals.length})
                             </h2>
-
                             <div className="space-y-6">
                                 {proposals.map((proposal) => (
                                     <div key={proposal.bid_id} className="border border-gray-100 rounded-lg p-5 hover:border-blue-200 transition-colors">
@@ -486,47 +426,24 @@ const ProjectDetail = () => {
                                                 </p>
                                             </div>
                                         </div>
-                                        {proposal.proposal && (
-                                            <div className="mt-4 pt-4 border-t border-gray-100">
-                                                <p className="text-gray-700 whitespace-pre-line">{proposal.proposal}</p>
+                                        <div className="mt-4">
+                                            <p className="text-gray-700 whitespace-pre-line">{proposal.cover_letter}</p>
+                                        </div>
+                                        {proposal.status === 'accepted' ? (
+                                            <div className="mt-4 bg-green-50 text-green-700 rounded-lg py-3 px-4 flex items-center">
+                                                <FiCheckCircle className="mr-2" />
+                                                <span>Proposal ini telah diterima</span>
                                             </div>
-                                        )}
-
-                                        {/* Accept Bid Button - Only show for clients and when project is open AND proposal is pending */}
-                                        {
-                                            project.status === 'open' &&
-                                            proposal.status === 'pending' && (
-                                                <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
-                                                    <button
-                                                        onClick={() => handleAcceptBid(proposal.bid_id)}
-                                                        disabled={acceptingBid}
-                                                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-                                                    >
-                                                        {acceptingBid ? (
-                                                            <>
-                                                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                                </svg>
-                                                                <span>Memproses...</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <FiCheckCircle className="mr-2" />
-                                                                <span>Terima Proposal</span>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                        {/* Show accepted status badge if this bid is accepted */}
-                                        {proposal.status === 'accepted' && (
-                                            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
-                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                    <FiCheckCircle className="mr-1.5" />
-                                                    Proposal Diterima
-                                                </span>
+                                        ) : project.status === 'open' && (
+                                            <div className="mt-4 text-right">
+                                                <button
+                                                    onClick={() => handleAcceptBid(proposal.bid_id)}
+                                                    disabled={acceptingBid}
+                                                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                                                >
+                                                    <FiCheckCircle className="mr-2" />
+                                                    <span>Terima Proposal</span>
+                                                </button>
                                             </div>
                                         )}
                                     </div>
@@ -536,6 +453,118 @@ const ProjectDetail = () => {
                     </div>
                 </div>
             )}
+
+            <div className="mt-8">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-6 sm:p-8">
+                        <h2 className="text-xl font-bold text-gray-900 mb-6 pb-4 border-b border-gray-100 flex items-center">
+                            <FiMessageCircle className="mr-2" />
+                            Komentar ({comments.length})
+                        </h2>
+                        <div className="mb-6">
+                            <form onSubmit={handleAddComment} className="flex">
+                                <input
+                                    type="text"
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
+                                    placeholder="Tulis komentar Anda..."
+                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!newComment.trim()}
+                                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-r-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                                >
+                                    <FiSend className="mr-2" />
+                                    Kirim
+                                </button>
+                            </form>
+                        </div>
+                        {comments.length > 0 ? (
+                            <div className="space-y-4">
+                                {comments.map((comment) => (
+                                    <div
+                                        key={comment.comment_id}
+                                        className="border border-gray-100 rounded-lg p-4 hover:border-blue-100 transition-colors"
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-start">
+                                                <div className="flex-shrink-0">
+                                                    {comment.user_picture ? (
+                                                        <img
+                                                            src={`http://127.0.0.1:8000${comment.user_picture}`}
+                                                            alt={comment.user_name}
+                                                            className="h-10 w-10 rounded-full object-cover border border-gray-200"
+                                                        />
+                                                    ) : (
+                                                        <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
+                                                            {comment.user_name?.charAt(0).toUpperCase() || "U"}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="ml-3">
+                                                    <p className="text-sm font-semibold text-gray-900">{comment.user_name}</p>
+                                                    <p className="text-xs text-gray-500">{formatDateTime(comment.created_at)}</p>
+                                                </div>
+                                            </div>
+                                            {currentUser && Number(currentUser.user_id) === Number(comment.user) && (
+                                                <div className="flex space-x-2">
+                                                    <button
+                                                        onClick={() => startEditing(comment)}
+                                                        className="text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        <FiEdit2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteComment(comment.comment_id)}
+                                                        className="text-red-600 hover:text-red-800"
+                                                    >
+                                                        <FiTrash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="mt-2">
+                                            {editingComment === comment.comment_id ? (
+                                                <div className="mt-2">
+                                                    <input
+                                                        type="text"
+                                                        value={editContent}
+                                                        onChange={(e) => setEditContent(e.target.value)}
+                                                        ref={commentInputRef}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                    <div className="mt-2 flex justify-end space-x-2">
+                                                        <button
+                                                            onClick={cancelEditing}
+                                                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                                                        >
+                                                            Batal
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleEditComment(comment.comment_id)}
+                                                            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                                                        >
+                                                            Simpan
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-700">{comment.content}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-10">
+                                <FiMessageCircle className="mx-auto h-12 w-12 text-gray-300" />
+                                <p className="mt-2 text-gray-500">Belum ada komentar. Jadilah yang pertama berkomentar!</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
