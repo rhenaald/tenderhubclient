@@ -17,7 +17,7 @@ const ProjectList = () => {
         max_budget: 0,
         deadline: "",
         category_id: "",
-        tags: []
+        tags_data: []
     });
     const [tagInput, setTagInput] = useState("");
     const [editingId, setEditingId] = useState(null);
@@ -29,10 +29,14 @@ const ProjectList = () => {
                 setLoading(true);
                 const [projectsRes, categoriesRes] = await Promise.all([
                     apiClient.get("/tenders/"),
-                    apiClient.get("/categories/") // Assuming this is your categories endpoint
+                    apiClient.get("/categories/")
                 ]);
-                
-                setProjects(projectsRes.data?.results || projectsRes.data || []);
+
+                // Filter to only show open projects
+                const allProjects = projectsRes.data?.results || projectsRes.data || [];
+                const openProjects = allProjects.filter(project => project.status === 'open');
+                setProjects(openProjects);
+
                 setCategories(categoriesRes.data?.results || categoriesRes.data || []);
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -52,14 +56,27 @@ const ProjectList = () => {
         });
     };
 
+    // Helper function to extract tag name regardless of format
+    const getTagName = (tag) => {
+        if (typeof tag === 'object' && tag !== null) {
+            return tag.name || "";
+        }
+        return tag || "";
+    };
+
+    // Fixed tag handling functions
     const handleTagActions = {
         add: () => {
-            if (tagInput.trim() && !formData.tags.some(tag =>
-                tag.toLowerCase() === tagInput.trim().toLowerCase()
+            const trimmedTag = tagInput.trim();
+            if (!trimmedTag) return;
+
+            // Check if tag already exists using the getTagName helper
+            if (!formData.tags_data.some(tag =>
+                getTagName(tag).toLowerCase() === trimmedTag.toLowerCase()
             )) {
                 setFormData({
                     ...formData,
-                    tags: [...formData.tags, tagInput.trim()]
+                    tags_data: [...formData.tags_data, { name: trimmedTag }]
                 });
                 setTagInput("");
             }
@@ -67,9 +84,16 @@ const ProjectList = () => {
         remove: (tagToRemove) => {
             setFormData({
                 ...formData,
-                tags: formData.tags.filter(tag => tag !== tagToRemove)
+                tags_data: formData.tags_data.filter(tag =>
+                    getTagName(tag) !== tagToRemove
+                )
             });
         }
+    };
+
+    // Simplified render tag function
+    const renderTag = (tag) => {
+        return getTagName(tag);
     };
 
     const resetForm = () => {
@@ -82,7 +106,7 @@ const ProjectList = () => {
             max_budget: 0,
             deadline: "",
             category_id: "",
-            tags: []
+            tags_data: []
         });
         setTagInput("");
         setEditingId(null);
@@ -93,7 +117,7 @@ const ProjectList = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Validasi form data
+        // Validasi form
         if (formData.min_budget > formData.max_budget) {
             setError("Budget minimal tidak boleh lebih besar dari budget maksimal");
             return;
@@ -105,87 +129,93 @@ const ProjectList = () => {
         }
 
         try {
-            // Format tags sesuai dengan yang diharapkan backend: array of objects dengan properti 'name'
-            const formattedTags = formData.tags.map(tag => ({ name: tag }));
-
             let dataToSend;
-            let config = {};
+            const headers = {
+                'Content-Type': formData.attachment ? 'multipart/form-data' : 'application/json'
+            };
 
-            // Jika ada attachment, gunakan FormData
+            // Format tags data consistent with object structure
+            const preparedTags = formData.tags_data.map(tag => {
+                const tagName = getTagName(tag);
+                return { name: tagName };
+            });
+
             if (formData.attachment) {
                 const formDataToSend = new FormData();
 
-                const jsonData = {
-                    ...formData,
-                    tags: formattedTags, // Gunakan formattedTags
-                    min_budget: Number(formData.min_budget),
-                    max_budget: Number(formData.max_budget),
-                    max_duration: Number(formData.max_duration),
-                    category_id: formData.category_id,
-                    attachment: null // Hapus attachment dari JSON karena akan dikirim terpisah
-                };
-
-                formDataToSend.append('json', JSON.stringify(jsonData));
+                // Tambahkan field satu per satu
+                formDataToSend.append('title', formData.title);
+                formDataToSend.append('description', formData.description);
+                formDataToSend.append('max_duration', formData.max_duration);
+                formDataToSend.append('min_budget', formData.min_budget);
+                formDataToSend.append('max_budget', formData.max_budget);
+                formDataToSend.append('deadline', formData.deadline);
+                formDataToSend.append('category_id', formData.category_id);
+                formDataToSend.append('tags_data', JSON.stringify(preparedTags));
                 formDataToSend.append('attachment', formData.attachment);
+
                 dataToSend = formDataToSend;
-                config = {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    }
-                };
             } else {
-                // Jika tidak ada attachment, kirim langsung sebagai JSON
                 dataToSend = {
-                    ...formData,
-                    tags: formattedTags, // Gunakan formattedTags
+                    title: formData.title,
+                    description: formData.description,
+                    max_duration: Number(formData.max_duration),
                     min_budget: Number(formData.min_budget),
                     max_budget: Number(formData.max_budget),
-                    max_duration: Number(formData.max_duration),
+                    deadline: formData.deadline,
                     category_id: formData.category_id,
-                    attachment: null // Explicitly set to null
-                };
-                config = {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                    tags_data: preparedTags
                 };
             }
 
             const url = editingId ? `/tenders/${editingId}/` : "/tenders/";
             const method = editingId ? "put" : "post";
 
-            const response = await apiClient[method](url, dataToSend, config);
+            console.log("Sending data:", {
+                url,
+                method,
+                data: dataToSend,
+                headers
+            });
+
+            const response = await apiClient[method](url, dataToSend, { headers });
+            console.log("Response:", response.data);
 
             resetForm();
+
+            // Refresh data proyek dan filter hanya yang open
             const res = await apiClient.get("/tenders/");
-            setProjects(res.data?.results || res.data || []);
+            const allProjects = res.data?.results || res.data || [];
+            const openProjects = allProjects.filter(project => project.status === 'open');
+            setProjects(openProjects);
+
         } catch (error) {
-            console.error("Error with project:", error);
-            console.log("Error response data:", error.response?.data);
+            console.error("Error submitting project:", error);
 
-            // Handle errors better
-            if (error.response?.data) {
-                const errorData = error.response.data;
+            let errorMessage = "Gagal menyimpan proyek. Coba lagi nanti.";
 
-                if (typeof errorData === 'object') {
-                    const errorMessages = Object.entries(errorData)
-                        .map(([field, errors]) => {
-                            if (Array.isArray(errors)) {
-                                return `${field}: ${errors[0]}`;
-                            } else if (typeof errors === 'object' && errors !== null) {
-                                return `${field}: ${JSON.stringify(errors)}`;
-                            }
-                            return `${field}: ${errors}`;
-                        })
-                        .join(', ');
+            if (error.response) {
+                console.error("Error response data:", error.response.data);
 
-                    setError(errorMessages || "Validation error occurred");
-                } else {
-                    setError(error.response.data.toString());
+                if (error.response.data) {
+                    // Handle error validasi
+                    if (typeof error.response.data === 'object') {
+                        const errorMessages = Object.entries(error.response.data)
+                            .map(([field, errors]) => {
+                                if (Array.isArray(errors)) {
+                                    return `${field}: ${errors.join(', ')}`;
+                                }
+                                return `${field}: ${errors}`;
+                            })
+                            .join('\n');
+                        errorMessage = errorMessages;
+                    } else {
+                        errorMessage = error.response.data.toString();
+                    }
                 }
-            } else {
-                setError("Gagal menyimpan proyek. Coba lagi nanti.");
             }
+
+            setError(errorMessage);
         }
     };
 
@@ -194,22 +224,27 @@ const ProjectList = () => {
             const res = await apiClient.get(`/tenders/${id}/`);
             const project = res.data;
 
-            // Format tags dari backend ke frontend
-            let formattedTags = [];
-            if (project.tags && Array.isArray(project.tags)) {
-                formattedTags = project.tags.map(tag => {
-                    // Jika tag berupa object (dari backend), ambil property 'name'
-                    // Jika berupa string langsung (fallback), gunakan string tersebut
-                    return typeof tag === 'object' ? tag.name : tag;
-                });
-            }
+            // Ensure consistent tag structure for editing
+            const formattedTags = Array.isArray(project.tags_data) ?
+                project.tags_data.map(tag => {
+                    if (typeof tag === 'string') {
+                        return { name: tag };
+                    } else if (typeof tag === 'object' && tag !== null) {
+                        return { name: tag.name || "" };
+                    }
+                    return { name: "" };
+                }) : [];
 
             setFormData({
-                ...project,
+                title: project.title,
+                description: project.description,
+                max_duration: project.max_duration,
+                min_budget: project.min_budget,
+                max_budget: project.max_budget,
                 deadline: project.deadline ? project.deadline.split('T')[0] : "",
                 category_id: project.category?.id || project.category_id || "",
-                tags: formattedTags, // Gunakan formattedTags
-                attachment: null // Reset attachment saat edit
+                tags_data: formattedTags,
+                attachment: null
             });
 
             setEditingId(id);
@@ -219,12 +254,17 @@ const ProjectList = () => {
             setError("Gagal memuat data proyek");
         }
     };
+
     const handleDelete = async (id) => {
         if (window.confirm("Yakin ingin menghapus proyek ini?")) {
             try {
                 await apiClient.delete(`/tenders/${id}/`);
+
+                // Refresh data proyek dan filter hanya yang open
                 const res = await apiClient.get("/tenders/");
-                setProjects(res.data?.results || res.data || []);
+                const allProjects = res.data?.results || res.data || [];
+                const openProjects = allProjects.filter(project => project.status === 'open');
+                setProjects(openProjects);
             } catch (error) {
                 console.error("Error deleting project:", error);
                 setError("Gagal menghapus proyek");
@@ -245,58 +285,75 @@ const ProjectList = () => {
         return category ? category.name : 'Tidak ada kategori';
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    };
+
     if (loading) {
-        return <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-        </div>;
+        return (
+            <div className="flex justify-center items-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+        );
     }
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="font-semibold text-xl">
-                    {isFormVisible ? (editingId ? "Edit Proyek" : "Buat Proyek Baru") : "Proyek Saya"}
+        <div className="p-6 max-w-7xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+                <h3 className="font-bold text-2xl text-gray-800">
+                    {isFormVisible ? (editingId ? "Edit Proyek" : "Buat Proyek Baru") : "Proyek Terbuka"}
                 </h3>
                 {!isFormVisible && (
                     <button
-                        className="bg-blue-500 text-white rounded-lg px-4 py-2"
+                        className="bg-blue-600 hover:bg-blue-700 transition-colors text-white rounded-lg px-5 py-2.5 font-medium shadow-sm"
                         onClick={() => setIsFormVisible(true)}
                     >
-                        Buat Proyek
+                        + Buat Proyek
                     </button>
                 )}
             </div>
 
             {isFormVisible ? (
-                <div className="bg-white rounded-xl border p-6">
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg">{error}</div>}
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-8">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {error && (
+                            <div className="bg-red-50 text-red-600 p-4 rounded-lg border border-red-100 whitespace-pre-line">
+                                {error}
+                            </div>
+                        )}
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Judul Proyek *</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Judul Proyek *</label>
                             <input
-                                type="text" name="title" value={formData.title}
-                                onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg"
+                                type="text"
+                                name="title"
+                                value={formData.title}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Deskripsi *</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi *</label>
                             <textarea
-                                name="description" value={formData.description}
-                                onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg min-h-[100px]"
+                                name="description"
+                                value={formData.description}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition min-h-[120px]"
                                 required
                             ></textarea>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Kategori *</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Kategori *</label>
                             <select
                                 name="category_id"
                                 value={formData.category_id}
                                 onChange={handleInputChange}
-                                className="w-full px-3 py-2 border rounded-lg"
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition appearance-none bg-white"
                                 required
                             >
                                 <option value="">Pilih Kategori</option>
@@ -308,87 +365,125 @@ const ProjectList = () => {
                             </select>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div>
-                                <label className="block text-sm font-medium mb-1">Durasi Maksimal (hari) *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Durasi Maksimal (hari) *</label>
                                 <input
-                                    type="number" name="max_duration" value={formData.max_duration}
-                                    onChange={handleInputChange} min="1" className="w-full px-3 py-2 border rounded-lg"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Budget Minimal (Rp) *</label>
-                                <input
-                                    type="number" name="min_budget" value={formData.min_budget}
-                                    onChange={handleInputChange} min="0" className="w-full px-3 py-2 border rounded-lg"
+                                    type="number"
+                                    name="max_duration"
+                                    value={formData.max_duration}
+                                    onChange={handleInputChange}
+                                    min="1"
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                                     required
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Budget Maksimal (Rp) *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Budget Minimal (Rp) *</label>
                                 <input
-                                    type="number" name="max_budget" value={formData.max_budget}
-                                    onChange={handleInputChange} min="0" className="w-full px-3 py-2 border rounded-lg"
+                                    type="number"
+                                    name="min_budget"
+                                    value={formData.min_budget}
+                                    onChange={handleInputChange}
+                                    min="0"
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Budget Maksimal (Rp) *</label>
+                                <input
+                                    type="number"
+                                    name="max_budget"
+                                    value={formData.max_budget}
+                                    onChange={handleInputChange}
+                                    min="0"
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                                     required
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Deadline *</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Deadline *</label>
                             <input
-                                type="date" name="deadline" value={formData.deadline}
-                                onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg"
+                                type="date"
+                                name="deadline"
+                                value={formData.deadline}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Lampiran</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Lampiran</label>
                             <input
-                                type="file" name="attachment"
-                                onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg"
+                                type="file"
+                                name="attachment"
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                             />
+                            {formData.attachment && (
+                                <p className="text-sm mt-1 text-gray-600">File terpilih: {formData.attachment.name}</p>
+                            )}
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Tag</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tag</label>
                             <div className="flex space-x-2">
                                 <input
-                                    type="text" value={tagInput} placeholder="Masukkan tag"
+                                    type="text"
+                                    value={tagInput}
+                                    placeholder="Masukkan tag"
                                     onChange={(e) => setTagInput(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleTagActions.add())}
-                                    className="flex-1 px-3 py-2 border rounded-lg"
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleTagActions.add();
+                                        }
+                                    }}
+                                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                                 />
-                                <button type="button" onClick={handleTagActions.add}
-                                    className="px-4 py-2 bg-blue-500 text-white rounded-lg">
+                                <button
+                                    type="button"
+                                    onClick={handleTagActions.add}
+                                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 transition-colors text-white rounded-lg font-medium"
+                                >
                                     Tambah
                                 </button>
                             </div>
 
-                            {formData.tags.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {formData.tags.map((tag, idx) => (
-                                        <div key={idx} className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-sm flex items-center">
-                                            {typeof tag === 'object' ? tag.name : tag}
-                                            <button type="button" onClick={() => handleTagActions.remove(tag)}
-                                                className="ml-1 text-blue-700">×</button>
+                            {formData.tags_data.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                    {formData.tags_data.map((tag, idx) => (
+                                        <div key={idx} className="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-sm flex items-center border border-blue-100">
+                                            {renderTag(tag)}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleTagActions.remove(renderTag(tag))}
+                                                className="ml-1.5 text-blue-700 hover:text-blue-900"
+                                            >
+                                                ×
+                                            </button>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
 
-                        <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
-                            <button type="button" onClick={resetForm}
-                                className="px-4 py-2 border rounded-lg">
+                        <div className="flex justify-end space-x-4 mt-8 pt-4 border-t">
+                            <button
+                                type="button"
+                                onClick={resetForm}
+                                className="px-5 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors rounded-lg font-medium"
+                            >
                                 Batal
                             </button>
-                            <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded-lg">
+                            <button
+                                type="submit"
+                                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 transition-colors text-white rounded-lg font-medium shadow-sm"
+                            >
                                 {editingId ? "Simpan Perubahan" : "Buat Proyek"}
                             </button>
                         </div>
@@ -396,65 +491,92 @@ const ProjectList = () => {
                 </div>
             ) : (
                 projects.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-6">
                         {projects.map((project) => (
-                            <div key={project.tender_id} className="border rounded-lg p-5 bg-white">
-                                <div className="flex justify-between">
-                                    <div>
-                                        <h4 className="font-semibold text-lg">{project.title}</h4>
-                                        <div className="text-sm text-gray-500">
-                                            <span className={`px-2 py-1 rounded-full text-xs ${project.status === 'open' ? 'bg-green-100 text-green-600' :
-                                                project.status === 'closed' ? 'bg-red-100 text-red-600' :
-                                                    'bg-blue-100 text-blue-600'
-                                                }`}>
-                                                {project.status === 'open' ? 'Terbuka' :
-                                                    project.status === 'closed' ? 'Ditutup' : 'Dalam proses'}
+                            <div key={project.tender_id} className="border border-gray-100 rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+                                <div className="flex flex-col md:flex-row justify-between md:items-center mb-3">
+                                    <div className="mb-3 md:mb-0">
+                                        <h4 className="font-bold text-xl text-gray-800 mb-1">{project.title}</h4>
+                                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                                            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                                Terbuka
                                             </span>
                                             {project.category_id && (
-                                                <span className="ml-2 text-gray-500">
+                                                <span className="text-gray-600 flex items-center">
+                                                    <span className="inline-block w-1 h-1 bg-gray-400 rounded-full mr-2"></span>
                                                     {getCategoryName(project.category_id)}
                                                 </span>
                                             )}
                                         </div>
                                     </div>
-                                    <span className="font-bold text-blue-500">
-                                        {formatCurrency(project.min_budget)} - {formatCurrency(project.max_budget)}
-                                    </span>
+                                    <div className="flex flex-col items-end">
+                                        <span className="font-bold text-lg text-blue-600">
+                                            {formatCurrency(project.min_budget)} - {formatCurrency(project.max_budget)}
+                                        </span>
+                                        <span className="text-xs text-gray-500 mt-1">Durasi: {project.max_duration} hari</span>
+                                    </div>
                                 </div>
 
                                 <p className="text-gray-700 my-4 line-clamp-3">{project.description}</p>
 
-                                {project.tags?.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 my-3">
-                                        {project.tags.map((tag, idx) => (
-                                            <span key={idx} className="bg-gray-100 px-2 py-1 rounded-full text-xs">
-                                                {typeof tag === 'object' ? tag.name : tag}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-6 gap-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                        {project.deadline && (
+                                            <div className="text-sm text-gray-600 flex items-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                Deadline: {formatDate(project.deadline)}
+                                            </div>
+                                        )}
 
-                                <div className="flex justify-between mt-4">
-                                    <span className="text-sm">Durasi max: {project.max_duration} hari</span>
-                                    <div className="space-x-3">
-                                        <button onClick={() => handleEdit(project.tender_id)}
-                                            className="text-blue-500 text-sm">Edit</button>
-                                        <button onClick={() => handleDelete(project.tender_id)}
-                                            className="text-red-500 text-sm">Hapus</button>
-                                        <Link to={`/ProjectDetail/${project.tender_id}`}
-                                            className="text-blue-500 text-sm">Lihat Detail</Link>
+                                        {project.tags_data?.length > 0 && (
+                                            <div className="flex flex-wrap gap-2">
+                                                {project.tags_data.map((tag, idx) => (
+                                                    <span key={idx} className="bg-gray-100 px-2 py-1 rounded-full text-xs text-gray-700">
+                                                        {renderTag(tag)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center space-x-3">
+                                        <button
+                                            onClick={() => handleEdit(project.tender_id)}
+                                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(project.tender_id)}
+                                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                        >
+                                            Hapus
+                                        </button>
+                                        <Link
+                                            to={`/ProjectDetail/${project.tender_id}`}
+                                            className="bg-blue-600 hover:bg-blue-700 transition-colors text-white rounded-lg px-4 py-2 text-sm font-medium"
+                                        >
+                                            Lihat Detail
+                                        </Link>
                                     </div>
                                 </div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center py-12 text-center">
-                        <h4 className="text-lg font-medium mb-2">Belum ada proyek aktif</h4>
-                        <p className="text-gray-500 mb-6">Mulai proyek baru untuk mencari vendor</p>
+                    <div className="flex flex-col items-center py-16 text-center bg-white rounded-xl shadow-sm border border-gray-100">
+                        <div className="h-20 w-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                        <h4 className="text-xl font-bold mb-2 text-gray-800">Belum ada proyek terbuka</h4>
+                        <p className="text-gray-600 mb-8 max-w-md">Mulai proyek baru untuk mencari vendor dan melihatnya di sini</p>
                         <button
                             onClick={() => setIsFormVisible(true)}
-                            className="bg-blue-500 text-white rounded-lg px-6 py-2"
+                            className="bg-blue-600 hover:bg-blue-700 transition-colors text-white rounded-lg px-6 py-3 font-medium shadow-sm"
                         >
                             Buat Proyek Baru
                         </button>
