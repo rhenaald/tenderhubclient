@@ -26,6 +26,8 @@ export default function ProjectDetail() {
   const [editCommentContent, setEditCommentContent] = useState("");
   const commentSectionRef = useRef(null);
 
+  console.log("Project ID:", comments);
+  
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user_data'));
     setCurrentUser(userData);
@@ -38,7 +40,7 @@ export default function ProjectDetail() {
         setError("Failed to fetch project details");
       }
     };
-    
+
     const fetchSimilarProjects = async () => {
       try {
         const response = await apiClient.get(`/tenders/?limit=3`);
@@ -49,33 +51,72 @@ export default function ProjectDetail() {
     const fetchComments = async () => {
       setIsLoadingComments(true);
       try {
-        const response = await apiClient.get(`/comments/?tender_id=${id}`);
-
-        let commentsData = [];
-        if (Array.isArray(response.data)) {
-          commentsData = response.data;
-        } else if (response.data?.results) {
-          commentsData = response.data.results;
-        } else if (response.data) {
-          commentsData = Object.values(response.data);
+        // Fetch comments
+        const commentsResponse = await apiClient.get(`/comments/?tender_id=${id}`);
+        let commentsData = commentsResponse.data.results || commentsResponse.data;
+        if (!Array.isArray(commentsData)) {
+          commentsData = [];
         }
 
-        const transformedComments = commentsData.map(comment => ({
-          id: comment.comment_id || comment.id,
-          tender_id: comment.tender,
-          user: {
-            id: comment.user,
-            name: comment.user_name,
-            profile_picture: comment.user_picture
-          },
-          content: comment.content,
-          created_at: comment.created_at,
-          updated_at: comment.updated_at
-        }));
+        // Fetch vendors data
+        const vendorsResponse = await apiClient.get('/users/vendors/');
+        const vendorsData = vendorsResponse.data.results || vendorsResponse.data;
+        console.log("Vendors Data:", vendorsData);
+        const vendorsMap = new Map();
+
+        // Create a map of vendor usernames to their data
+        if (Array.isArray(vendorsData)) {
+          vendorsData.forEach(vendor => {
+            if (vendor.user) {
+              vendorsMap.set(vendor.user, vendor);
+            }
+          });
+        }
+        console.log("Vendors Map:", vendorsMap);
+        const transformedComments = commentsData.map(comment => {
+          // Default user data from comment
+          const userFromComment = {
+            id: comment.user?.id || comment.user,
+            name: comment.user?.name || comment.user_name,
+            profile_picture: comment.user?.profile_picture || comment.user_picture,
+            user_type: comment.user?.user_type || comment.user_type || 'client'
+          };
+
+          // If user is a vendor, try to match with vendors data
+          if (userFromComment.user_type === 'vendor' && userFromComment.name) {
+            const matchedVendor = vendorsMap.get(userFromComment.name);
+            if (matchedVendor) {
+              return {
+                id: comment.comment_id || comment.id,
+                tender_id: comment.tender || comment.tender_id,
+                user: {
+                  id: matchedVendor.id, // Use vendor ID from vendors endpoint
+                  name: matchedVendor.name || userFromComment.name,
+                  profile_picture: matchedVendor.profile_picture || userFromComment.profile_picture,
+                  user_type: 'vendor' // Ensure type is vendor
+                },
+                content: comment.content,
+                created_at: comment.created_at,
+                updated_at: comment.updated_at
+              };
+            }
+          }
+
+          // Default case (not a vendor or no match found)
+          return {
+            id: comment.comment_id || comment.id,
+            tender_id: comment.tender || comment.tender_id,
+            user: userFromComment,
+            content: comment.content,
+            created_at: comment.created_at,
+            updated_at: comment.updated_at
+          };
+        });
 
         setComments(transformedComments);
       } catch (err) {
         setComments([]);
+        console.error("Error fetching comments or vendors:", err);
       } finally {
         setIsLoadingComments(false);
       }
@@ -175,11 +216,12 @@ export default function ProjectDetail() {
 
       const newCommentData = {
         id: response.data.comment_id || response.data.id,
-        tender_id: response.data.tender,
+        tender_id: response.data.tender || response.data.tender_id,
         user: {
-          id: currentUser.id,
+          id: currentUser.user_id,
           name: currentUser.name || currentUser.username,
-          profile_picture: currentUser.profile_picture
+          profile_picture: currentUser.profile_picture,
+          user_type: currentUser.user_type
         },
         content: response.data.content,
         created_at: response.data.created_at,
@@ -211,13 +253,16 @@ export default function ProjectDetail() {
         content: editCommentContent
       });
 
+      // Update the comment in the local state
       setComments(prevComments =>
         prevComments.map(comment =>
-          comment.id === commentId ? {
-            ...comment,
-            content: response.data.content,
-            updated_at: response.data.updated_at
-          } : comment
+          comment.id === commentId
+            ? {
+              ...comment,
+              content: response.data.content,
+              updated_at: response.data.updated_at
+            }
+            : comment
         )
       );
 
@@ -230,6 +275,7 @@ export default function ProjectDetail() {
       }, 3000);
     } catch (err) {
       setCommentError(err.response?.data?.message || "Failed to update comment. Please try again.");
+      console.error("Edit comment error:", err);
     }
   };
 
@@ -241,6 +287,7 @@ export default function ProjectDetail() {
     try {
       await apiClient.delete(`/comments/${commentId}/`);
 
+      // Remove the comment from local state
       setComments(prevComments =>
         prevComments.filter(comment => comment.id !== commentId)
       );
@@ -251,6 +298,7 @@ export default function ProjectDetail() {
       }, 3000);
     } catch (err) {
       setCommentError(err.response?.data?.message || "Failed to delete comment. Please try again.");
+      console.error("Delete comment error:", err);
     }
   };
 
@@ -290,8 +338,9 @@ export default function ProjectDetail() {
     );
   }
 
-  const isClient = currentUser && currentUser.id === project.client;
+  const isClient = currentUser && currentUser.user_id === project.client;
   const isFreelancer = currentUser && currentUser.user_type === 'vendor';
+
 
   return (
     <>
@@ -398,41 +447,41 @@ export default function ProjectDetail() {
                     <p className="text-gray-500">Loading your bids...</p>
                   ) : userBids.length > 0 ? (
                     <div className="space-y-4">
-                        {userBids.map((bid) => (
-                          <div key={bid.bid_id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h4 className="font-semibold text-gray-800">
-                                  Bid Amount: Rp {Number(bid.amount).toLocaleString()}
-                                </h4>
-                                <p className="text-sm text-gray-500">
-                                  Delivery Time: {bid.delivery_time} days
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  Submitted on {formatDateTime(bid.created_at)}
-                                </p>
-                              </div>
-                              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${bid.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                  bid.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                    'bg-blue-100 text-blue-800'
-                                }`}>
-                                {bid.status}
-                              </span>
+                      {userBids.map((bid) => (
+                        <div key={bid.bid_id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-semibold text-gray-800">
+                                Bid Amount: Rp {Number(bid.amount).toLocaleString()}
+                              </h4>
+                              <p className="text-sm text-gray-500">
+                                Delivery Time: {bid.delivery_time} days
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Submitted on {formatDateTime(bid.created_at)}
+                              </p>
                             </div>
-                            <div className="mt-2">
-                              <h5 className="text-sm font-medium text-gray-700">Proposal:</h5>
-                              <p className="text-gray-600 whitespace-pre-wrap">{bid.proposal}</p>
-                            </div>
-                            <div className="mt-2 flex items-center">
-                              <img
-                                src={bid.vendor_profile?.profile_picture ? `http://127.0.0.1:8000${bid.vendor_profile.profile_picture}` : "https://via.placeholder.com/40"}
-                                alt={bid.vendor_name}
-                                className="w-6 h-6 rounded-full mr-2"
-                              />
-                              <span className="text-sm text-gray-600">{bid.vendor_name}</span>
-                            </div>
+                            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${bid.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                              bid.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                              {bid.status}
+                            </span>
                           </div>
-                        ))}
+                          <div className="mt-2">
+                            <h5 className="text-sm font-medium text-gray-700">Proposal:</h5>
+                            <p className="text-gray-600 whitespace-pre-wrap">{bid.proposal}</p>
+                          </div>
+                          <div className="mt-2 flex items-center">
+                            <img
+                              src={bid.vendor_profile?.profile_picture ? `http://127.0.0.1:8000${bid.vendor_profile.profile_picture}` : "https://via.placeholder.com/40"}
+                              alt={bid.vendor_name}
+                              className="w-6 h-6 rounded-full mr-2"
+                            />
+                            <span className="text-sm text-gray-600">{bid.vendor_name}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <>
@@ -602,8 +651,10 @@ export default function ProjectDetail() {
                               : `/client/profile/${comment.user.id}`}
                             >
                               <img
-                                src={comment.user?.profile_picture ? `http://127.0.0.1:8000${comment.user.profile_picture}` : "https://via.placeholder.com/40"}
-                                alt={comment.user?.name || comment.user?.user_name || "User"}
+                                src={comment.user?.profile_picture
+                                  ? `http://127.0.0.1:8000${comment.user.profile_picture}`
+                                  : "https://via.placeholder.com/40"}
+                                alt={comment.user?.name || "User"}
                                 className="w-8 h-8 rounded-full object-cover mr-3"
                               />
                             </Link>
@@ -618,7 +669,7 @@ export default function ProjectDetail() {
                             </div>
                           </div>
 
-                          {currentUser && comment.user?.id === currentUser.id && (
+                          {currentUser && comment.user?.id === currentUser.user_id && (
                             <div className="flex space-x-2">
                               <button
                                 onClick={() => handleStartEdit(comment)}
@@ -662,6 +713,27 @@ export default function ProjectDetail() {
                   {formatDate(project.deadline)}
                 </p>
               </div>
+              
+              {project.tags_data && project.tags_data.length > 0 && (
+                <div className="mb-4 pb-4 border-b border-gray-200">
+                  <div className="flex items-center text-sm text-gray-500 mb-1">
+                    <span>Tags</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {project.tags_data
+                      .filter(tag => tag?.id && tag?.name) // Filter hanya tag yang valid
+                      .map(tag => (
+                        <span
+                          key={`tag-${tag.id}`}
+                          className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                        >
+                          {tag.name}
+                        </span>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
 
               <div className="mb-4 pb-4 border-b border-gray-200">
                 <p className="text-gray-600 text-sm mb-1">Category</p>
@@ -673,22 +745,6 @@ export default function ProjectDetail() {
                   )}
                 </div>
               </div>
-
-              {project.tags && project.tags.length > 0 && (
-                <div className="mb-6 pb-4 border-b border-gray-200">
-                  <p className="text-gray-600 text-sm mb-1">Tags</p>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {project.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="bg-gray-200 text-gray-700 text-xs font-medium rounded-full py-1 px-3"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               <div className="mb-4">
                 <p className="text-gray-600 text-sm mb-1">Comments</p>
@@ -716,28 +772,28 @@ export default function ProjectDetail() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {similarProjects.map((project) => (
+              {similarProjects.slice(0, 3).map((project) => (
                 <Link to={`/projects/${project.tender_id}`} key={project.tender_id}>
-                  <article className="relative bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition duration-300">
+                  <article className="relative bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition duration-300 h-full flex flex-col">
                     <span className="absolute top-2 right-2 bg-green-500 text-white text-xs sm:text-sm font-semibold px-3 py-1 rounded-full z-10 shadow">
                       {project.status}
                     </span>
 
-                    <div className="bg-gradient-to-r from-[#5B8CFF] to-[#7DA7FF] h-36">
+                    <div className="bg-gradient-to-r from-[#5B8CFF] to-[#7DA7FF] h-48 flex-shrink-0">
                       {project.attachment ? (
                         <img
                           src={project.attachment}
                           alt={project.title}
-                          className="w-full h-36 object-cover"
+                          className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-36 flex items-center justify-center">
+                        <div className="w-full h-full flex items-center justify-center">
                           <i className="fas fa-briefcase text-white text-3xl"></i>
                         </div>
                       )}
                     </div>
 
-                    <div className="p-4">
+                    <div className="p-4 flex flex-col flex-grow">
                       <div className="flex items-center space-x-2 mb-2">
                         <img
                           src={`http://127.0.0.1:8000${project.client_picture}`}
@@ -749,11 +805,27 @@ export default function ProjectDetail() {
                         </span>
                       </div>
 
-                      <h3 className="text-[#5B8CFF] text-xs sm:text-sm font-normal leading-snug line-clamp-2">
+                      <h3 className="text-[#5B8CFF] text-sm font-semibold leading-snug line-clamp-2 mb-2">
                         {project.title}
                       </h3>
 
-                      <p className="text-xs sm:text-sm text-gray-700 mt-2">
+                      {project.tags_data && project.tags_data.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {project.tags_data
+                            .filter(tag => tag?.id && tag?.name)
+                            .map(tag => (
+                              <span
+                                key={`tag-${tag.id}`}
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                              >
+                                {tag.name}
+                              </span>
+                            ))
+                          }
+                        </div>
+                      )}
+
+                      <p className="text-sm text-gray-700 mt-auto">
                         Budget:{" "}
                         <span className="font-semibold">
                           Rp {Number(project.min_budget).toLocaleString()} - Rp{" "}
@@ -761,13 +833,13 @@ export default function ProjectDetail() {
                         </span>
                       </p>
 
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {project.category && (
-                          <span className="bg-[#5B8CFF] text-white text-xs sm:text-sm font-medium rounded-full py-1 px-3">
+                      {project.category && (
+                        <div className="mt-3">
+                          <span className="bg-[#5B8CFF] text-white text-xs font-medium rounded-full py-1 px-3">
                             {project.category.name}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </article>
                 </Link>
