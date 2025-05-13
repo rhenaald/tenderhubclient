@@ -1,9 +1,10 @@
 import React from 'react';
 import ProjectsTab from './ProjectsTab';
-import HistoryTab from './HistoryTab';
 import PortfolioTab from './PortfolioTab';
 import CertificationsTab from './CertificationsTab';
 import EducationTab from './EducationTab';
+import ReviewList from '../client/ReviewList';
+import SkillsTab from './SkillsTab';
 
 const ProfileTabs = ({
     activeTab,
@@ -32,7 +33,7 @@ const ProfileTabs = ({
     newEducation,
     handleEducationInputChange,
     handleAddEducation,
-    handleDeleteEducation
+    handleDeleteEducation,
 }) => {
     return (
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -42,12 +43,6 @@ const ProfileTabs = ({
                     className={`py-4 px-6 ${activeTab === "projects" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
                 >
                     Proyek Saya
-                </button>
-                <button
-                    onClick={() => setActiveTab("history")}
-                    className={`py-4 px-6 ${activeTab === "history" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
-                >
-                    Riwayat
                 </button>
                 {isVendor && (
                     <>
@@ -69,12 +64,23 @@ const ProfileTabs = ({
                         >
                             Sertifikasi
                         </button>
+                        <button
+                            onClick={() => setActiveTab("reviews")}
+                            className={`py-4 px-6 ${activeTab === "reviews" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
+                        >
+                            Review
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("skills")}
+                            className={`py-4 px-6 ${activeTab === "skills" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
+                        >
+                            Skills
+                        </button>
                     </>
                 )}
             </div>
 
             {activeTab === "projects" && <ProjectsTab />}
-            {activeTab === "history" && <HistoryTab />}
             {activeTab === "portfolio" && (
                 <PortfolioTab
                     isAddingPortfolio={isAddingPortfolio}
@@ -113,6 +119,8 @@ const ProfileTabs = ({
                     isLoading={isLoading}
                 />
             )}
+            {activeTab === "reviews" && <ReviewList />}
+            {activeTab === "skills" && <SkillsTab />}
         </div>
     );
 };
