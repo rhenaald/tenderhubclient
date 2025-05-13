@@ -126,7 +126,7 @@ const ProfilePage = () => {
   }, []);
 
   return (
-    <main className="max-w-4xl mx-auto mt-28 flex flex-col space-y-6 mb-12 px-4">
+    <main className="max-full mx-10 mt-28 flex flex-col space-y-6 mb-12 px-4">
       <ProfileHeader
         profileData={profileData}
         clientData={clientData}
