@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiClient } from "../../../api/apiService";
-import { FiArrowLeft, FiExternalLink, FiClock, FiDollarSign, FiCalendar, FiTag, FiUser, FiCheckCircle, FiEdit2, FiTrash2, FiMessageCircle, FiSend } from "react-icons/fi";
+import { FiArrowLeft, FiExternalLink, FiClock, FiDollarSign, FiHash, FiCalendar, FiTag, FiUser, FiCheckCircle, FiEdit2, FiTrash2, FiMessageCircle, FiSend } from "react-icons/fi";
 
 const ProjectDetail = () => {
     const { id } = useParams();
@@ -26,6 +26,7 @@ const ProjectDetail = () => {
         const fetchProjectData = async () => {
             try {
                 const response = await apiClient.get(`/tenders/${id}/`);
+                console.log(response.data);
                 setProject(response.data);
             } catch (error) {
                 setError("Gagal memuat detail proyek");
@@ -289,7 +290,7 @@ const ProjectDetail = () => {
                     <div className="p-6 sm:p-8">
                         <div className="flex flex-col sm:flex-row justify-between items-start gap-6">
                             <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-3">
+                                <div className="flex items-center gap-3 mb-3 flex-wrap">
                                     {getStatusBadge()}
                                     {project.category && (
                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -379,6 +380,28 @@ const ProjectDetail = () => {
                                     </div>
                                     <p className="text-gray-900 font-medium">{comments.length} komentar</p>
                                 </div>
+                                {project.tags_data && project.tags_data.length > 0 && (
+                                    <div>
+                                        <div className="flex items-center text-sm text-gray-500 mb-1">
+                                            <FiHash className="mr-2" />
+                                            <span>Tags</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {project.tags_data
+                                                .filter(tag => tag?.id && tag?.name) // Filter hanya tag yang valid
+                                                .map(tag => (
+                                                    <span
+                                                        key={`tag-${tag.id}`}
+                                                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                                                    >
+                                                        <FiHash className="mr-1" size={12} />
+                                                        {tag.name}
+                                                    </span>
+                                                ))
+                                            }
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
