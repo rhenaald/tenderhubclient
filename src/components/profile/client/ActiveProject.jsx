@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { apiClient } from "../../../api/apiService";
 
 // Custom hook for user data
+
 const useUserData = () => {
     const getUserData = () => {
         try {
@@ -15,7 +16,6 @@ const useUserData = () => {
     };
 
     const userData = getUserData();
-    console.log("User data from localStorage:", userData);
     return {
         userData,
         isClient: userData?.user_type === 'client',
@@ -60,8 +60,6 @@ const ReviewForm = ({ project, revieweeId, projectStatus, onReviewSubmit }) => {
                 project: project
             });
 
-            // Convert revieweeId and project to strings to ensure consistent formatting
-            // Many APIs expect IDs as strings even if they're numeric
             const reviewData = {
                 reviewee: String(revieweeId),
                 rating: rating,
@@ -69,10 +67,7 @@ const ReviewForm = ({ project, revieweeId, projectStatus, onReviewSubmit }) => {
                 project: String(project)
             };
 
-            // Send the request with the properly formatted data
             const response = await apiClient.post('/users/reviews/', reviewData);
-
-            console.log("Review submission successful:", response.data);
 
             setRating(0);
             setComment("");
@@ -83,9 +78,8 @@ const ReviewForm = ({ project, revieweeId, projectStatus, onReviewSubmit }) => {
             if (err.response?.data) {
                 console.log("Error response data:", err.response.data);
 
-                // Improved error handling - check for different response formats
                 if (typeof err.response.data === 'object') {
-                    // Handle case where API returns object with field-specific errors
+                
                     const errorMessage = Object.entries(err.response.data)
                         .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
                         .join(', ');
@@ -575,16 +569,15 @@ const ProjectDetails = ({ project, formatDate, isClient, isVendor, userId, fetch
     const [reviews, setReviews] = useState([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
 
+
     const fetchReviews = useCallback(async () => {
         try {
             setLoadingReviews(true);
-            console.log('Fetching reviews for project:', project.project_id); // Debug log
             const response = await apiClient.get(`/users/reviews/?project=${project.project_id}`);
-            console.log('Reviews response:', response); // Debug log
             setReviews(response.data.results || response.data);
         } catch (err) {
             console.error("Error fetching reviews:", err);
-            console.log('Error details:', err.response); // More detailed error logging
+            console.log('Error details:', err.response);
         } finally {
             setLoadingReviews(false);
         }
@@ -602,29 +595,19 @@ const ProjectDetails = ({ project, formatDate, isClient, isVendor, userId, fetch
     };
 
     const getRevieweeId = () => {
-        // More robust handling of reviewee identification
         if (isClient) {
-            // If the current user is the client, they should review the vendor
             const vendorId = project.vendor_id || project.vendor;
-            console.log("Client reviewing vendor with ID:", vendorId);
             return vendorId;
         }
 
         if (isVendor) {
-            // If the current user is the vendor, they should review the client
             const clientId = project.client_id || project.client;
-            console.log("Vendor reviewing client with ID:", clientId);
             return clientId;
         }
 
         console.log("Could not determine reviewee - user is neither client nor vendor");
         return null;
     };
-
-    // Debug logs to help identify the issue
-    console.log('Project data:', project);
-    console.log('User roles:', { isClient, isVendor, userId });
-    console.log('Determined reviewee ID:', getRevieweeId());
 
     // Check if the current user has already submitted a review
     const hasReviewed = reviews.some(review => review.reviewer === userId || review.reviewer === String(userId));
