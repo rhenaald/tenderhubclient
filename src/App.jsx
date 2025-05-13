@@ -15,13 +15,13 @@ import Registration from "./Authentication/Registration";
 import Login from "./Authentication/Login";
 import DetailProjek from "./pages/DetailProjek";
 import ProfilePage from "./pages/Profile";
-import ActivityPage from "./pages/Activity";
 import ProfileVendor from "./pages/vendors/Profile";
 import ProfileClient from "./pages/clients/Profile";
 import Dashboard from "./pages/admin/dashboard";
 import ProjectDetail from "./components/profile/client/ProjectDetail";
 import Activity from "./components/profile/client/Activity";
 import ActiveProjectDetail from "./components/profile/client/ActiveProject";
+import VendorProfile from "./pages/VendorProfile";
 
 // PrivateRoute component with authService
 const PrivateRoute = ({ children }) => {
@@ -61,19 +61,13 @@ function LayoutWrapper() {
           </PrivateRoute>
         } />
 
-        <Route path="/activity" element={
-          <PrivateRoute>
-            <ActivityPage />
-          </PrivateRoute>
-        } />
-
         <Route path="/dashboard" element={
           <PrivateRoute>
             <Dashboard />
           </PrivateRoute>
         } />
-        {/* <Route path="/vendor/profile/:id" element={<VendorProfile />} />
-        <Route path="/client/profile/:id" element={<ClientProfile />} /> */}
+        <Route path="/vendor/profile/:id" element={<VendorProfile />} />
+        {/* <Route path="/client/profile/:id" element={<ClientProfile />} /> */}
 
         <Route path="/Activity-projects/:id" element={<ActiveProjectDetail />} />
         <Route path="/History/:id" element={<Activity />} />
