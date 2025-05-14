@@ -166,16 +166,15 @@ const Header = () => {
 
     const getProfilePath = () => {
         const { userType } = userData;
-        switch (userType.toLowerCase()) {
-            case "vendor":
-                return "/profile-vendor";
-            case "client":
-                return "/profile-client";
-            default:
-                return "/dashboard"; 
-        }
-    };
+        if (!userType) return;
 
+        const type = userType.toLowerCase();
+        if (type === "vendor") return "/profile-vendor";
+        if (type === "client") return "/profile-client";
+
+        return "/dashboard";
+    };
+    
     const toggleDropdown = (e) => {
         e.stopPropagation();
         setDropdownOpen(prev => !prev);
