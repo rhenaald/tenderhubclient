@@ -35,92 +35,81 @@ const ProfileTabs = ({
     handleAddEducation,
     handleDeleteEducation,
 }) => {
+    const tabs = [
+        { id: "projects", label: "Proyek Saya" },
+        ...(isVendor ? [
+            { id: "portfolio", label: "Portfolio" },
+            { id: "education", label: "Pendidikan" },
+            { id: "certifications", label: "Sertifikasi" },
+            { id: "reviews", label: "Review" },
+            { id: "skills", label: "Skills" }
+        ] : [])
+    ];
+
     return (
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="flex text-lg font-semibold text-gray-700 select-none border-b overflow-x-auto">
-                <button
-                    onClick={() => setActiveTab("projects")}
-                    className={`py-4 px-6 ${activeTab === "projects" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
-                >
-                    Proyek Saya
-                </button>
-                {isVendor && (
-                    <>
-                        <button
-                            onClick={() => setActiveTab("portfolio")}
-                            className={`py-4 px-6 ${activeTab === "portfolio" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
-                        >
-                            Portfolio
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("education")}
-                            className={`py-4 px-6 ${activeTab === "education" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
-                        >
-                            Pendidikan
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("certifications")}
-                            className={`py-4 px-6 ${activeTab === "certifications" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
-                        >
-                            Sertifikasi
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("reviews")}
-                            className={`py-4 px-6 ${activeTab === "reviews" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
-                        >
-                            Review
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("skills")}
-                            className={`py-4 px-6 ${activeTab === "skills" ? "text-blue-500 font-bold border-b-2 border-blue-500" : "hover:bg-blue-50 transition duration-200"}`}
-                        >
-                            Skills
-                        </button>
-                    </>
-                )}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md">
+            <div className="flex space-x-1 p-2 border-b border-gray-100 overflow-x-auto scrollbar-hide">
+                {tabs.map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`relative py-3 px-4 text-sm font-medium rounded-lg transition-all duration-200 
+                            ${activeTab === tab.id
+                                ? "text-indigo-600 bg-indigo-50"
+                                : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                            }`}
+                    >
+                        {tab.label}
+                        {activeTab === tab.id && (
+                            <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-4/5 h-0.5 bg-indigo-500 rounded-full" />
+                        )}
+                    </button>
+                ))}
             </div>
 
-            {activeTab === "projects" && <ProjectsTab />}
-            {activeTab === "portfolio" && (
-                <PortfolioTab
-                    isAddingPortfolio={isAddingPortfolio}
-                    setIsAddingPortfolio={setIsAddingPortfolio}
-                    portfolioItems={portfolioItems}
-                    newPortfolio={newPortfolio}
-                    portfolioPreview={portfolioPreview}
-                    handlePortfolioInputChange={handlePortfolioInputChange}
-                    handlePortfolioImageChange={handlePortfolioImageChange}
-                    handleAddPortfolio={handleAddPortfolio}
-                    handleDeletePortfolio={handleDeletePortfolio}
-                    isLoading={isLoading}
-                />
-            )}
-            {activeTab === "education" && (
-                <EducationTab
-                    educationItems={educationItems}
-                    isAddingEducation={isAddingEducation}
-                    setIsAddingEducation={setIsAddingEducation}
-                    newEducation={newEducation}
-                    handleEducationInputChange={handleEducationInputChange}
-                    handleAddEducation={handleAddEducation}
-                    handleDeleteEducation={handleDeleteEducation}
-                    isLoading={isLoading}
-                />
-            )}
-            {activeTab === "certifications" && (
-                <CertificationsTab
-                    certifications={certifications}
-                    isAddingCertification={isAddingCertification}
-                    setIsAddingCertification={setIsAddingCertification}
-                    newCertification={newCertification}
-                    handleCertificationInputChange={handleCertificationInputChange}
-                    handleAddCertification={handleAddCertification}
-                    handleDeleteCertification={handleDeleteCertification}
-                    isLoading={isLoading}
-                />
-            )}
-            {activeTab === "reviews" && <ReviewList />}
-            {activeTab === "skills" && <SkillsTab />}
+            <div className="p-4 md:p-6 transition-all duration-300">
+                {activeTab === "projects" && <ProjectsTab />}
+                {activeTab === "portfolio" && (
+                    <PortfolioTab
+                        isAddingPortfolio={isAddingPortfolio}
+                        setIsAddingPortfolio={setIsAddingPortfolio}
+                        portfolioItems={portfolioItems}
+                        newPortfolio={newPortfolio}
+                        portfolioPreview={portfolioPreview}
+                        handlePortfolioInputChange={handlePortfolioInputChange}
+                        handlePortfolioImageChange={handlePortfolioImageChange}
+                        handleAddPortfolio={handleAddPortfolio}
+                        handleDeletePortfolio={handleDeletePortfolio}
+                        isLoading={isLoading}
+                    />
+                )}
+                {activeTab === "education" && (
+                    <EducationTab
+                        educationItems={educationItems}
+                        isAddingEducation={isAddingEducation}
+                        setIsAddingEducation={setIsAddingEducation}
+                        newEducation={newEducation}
+                        handleEducationInputChange={handleEducationInputChange}
+                        handleAddEducation={handleAddEducation}
+                        handleDeleteEducation={handleDeleteEducation}
+                        isLoading={isLoading}
+                    />
+                )}
+                {activeTab === "certifications" && (
+                    <CertificationsTab
+                        certifications={certifications}
+                        isAddingCertification={isAddingCertification}
+                        setIsAddingCertification={setIsAddingCertification}
+                        newCertification={newCertification}
+                        handleCertificationInputChange={handleCertificationInputChange}
+                        handleAddCertification={handleAddCertification}
+                        handleDeleteCertification={handleDeleteCertification}
+                        isLoading={isLoading}
+                    />
+                )}
+                {activeTab === "reviews" && <ReviewList />}
+                {activeTab === "skills" && <SkillsTab />}
+            </div>
         </div>
     );
 };
