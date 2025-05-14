@@ -6,9 +6,11 @@ export default function App() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [categories, setCategories] = useState([]);
   const projectsPerPage = 6;
 
   useEffect(() => {
@@ -16,8 +18,21 @@ export default function App() {
       try {
         setLoading(true);
         const response = await apiClient.get("/tenders/");
-        console.log(response)
+        console.log(response);
         setProjects(response.data.results || []);
+
+        // Extract unique categories from projects
+        const uniqueCategories = [];
+        const categoryIds = new Set();
+
+        (response.data.results || []).forEach(project => {
+          if (project.category && !categoryIds.has(project.category.id)) {
+            categoryIds.add(project.category.id);
+            uniqueCategories.push(project.category);
+          }
+        });
+
+        setCategories(uniqueCategories);
         setLoading(false);
       } catch (err) {
         setError("Failed to fetch projects");
@@ -31,10 +46,13 @@ export default function App() {
 
   // Filter and search projects
   const filteredProjects = projects.filter(project => {
-    const matchesFilter = filter === "all" || project.status.toLowerCase() === filter;
+    const matchesStatusFilter = statusFilter === "all" || project.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchesCategoryFilter = categoryFilter === "all" ||
+      (project.tender_category_id && project.tender_category_id.toString() === categoryFilter);
     const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.description.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
+
+    return matchesStatusFilter && matchesCategoryFilter && matchesSearch;
   });
 
   // Pagination
@@ -47,6 +65,11 @@ export default function App() {
     setCurrentPage(pageNumber);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, categoryFilter, searchTerm]);
 
   return (
     <div className="min-h-screen">
@@ -86,8 +109,81 @@ export default function App() {
         </div>
       </header>
 
+      {/* FILTER SECTION */}
+      {/* <div className="max-w-5xl mx-auto px-4 -mt-16 mb-8 relative z-10"> */}
+      <div className="max-w-5xl mx-auto px-4 -mt-8 mb-8 bg-white rounded-lg shadow-md p-6 relative z-10">
+        <div className="flex flex-col md:flex-row justify-between gap-4">
+          {/* Status Filter */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Statuses</option>
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="closed">Closed</option>
+              <option value="completed">Completed</option>
+              <option value="in review">In Review</option>
+            </select>
+          </div>
+
+          {/* Category Filter */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Categories</option>
+              {categories.map(category => (
+                <option key={category.id} value={category.id.toString()}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filter Stats */}
+          <div className="flex-1 flex items-end">
+            <div className="bg-blue-50 w-full p-2 rounded-md border border-blue-100">
+              <p className="text-sm text-blue-800">
+                <span className="font-medium">{filteredProjects.length}</span> projects found
+              </p>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {statusFilter !== "all" && (
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full flex items-center">
+                    Status: {statusFilter}
+                    <button
+                      onClick={() => setStatusFilter("all")}
+                      className="ml-1 text-blue-600 hover:text-blue-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+                {categoryFilter !== "all" && (
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full flex items-center">
+                    Category: {categories.find(c => c.id.toString() === categoryFilter)?.name || categoryFilter}
+                    <button
+                      onClick={() => setCategoryFilter("all")}
+                      className="ml-1 text-blue-600 hover:text-blue-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* MAIN CONTENT */}
-      <main className="max-w-5xl mx-auto px-4 -mt-8 mb-20">
+      <main className="max-w-5xl mx-auto px-4 mb-20">
         {/* PROJECT GRID */}
         <section>
           {loading ? (
@@ -120,7 +216,7 @@ export default function App() {
               {error}
             </div>
           ) : currentProjects.length === 0 ? (
-            <div className="bg-yellow-50 border mt-30 border-yellow-200 text-yellow-700 px-4 py-8 rounded-lg text-center">
+            <div className="bg-yellow-50 border mt-10 border-yellow-200 text-yellow-700 px-4 py-8 rounded-lg text-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
               </svg>
@@ -147,6 +243,13 @@ export default function App() {
                                   "bg-gray-500 text-white"}`}>
                         {project.status}
                       </span>
+
+                      {/* Category Tag */}
+                      {project.category && (
+                        <span className="absolute top-3 left-3 text-xs font-semibold px-3 py-1 rounded-full bg-blue-700 text-white z-10">
+                          {project.category.name}
+                        </span>
+                      )}
 
                       {project.attachment ? (
                         <img
@@ -177,20 +280,15 @@ export default function App() {
                         </span>
                       </div>
 
+                      <div className="flex items-center mb-2">
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full mr-2">
+                          {project.bid_count || 0} bids
+                        </span>
+                      </div>
+
                       <h3 className="text-lg font-medium text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-2">
                         {project.title}
                       </h3>
-
-                      <p className="text-sm text-gray-500 mb-4 flex-1">
-                        {project.description ? (
-                          <>
-                            {project.description.slice(0, 100)}
-                            {project.description.length > 100 ? "..." : ""}
-                          </>
-                        ) : (
-                          "No description available"
-                        )}
-                      </p>
 
                       <div className="border-t border-gray-100 pt-4 mt-auto">
                         <div className="flex justify-between items-center mb-2">
@@ -224,10 +322,9 @@ export default function App() {
                           )}
                         </div>
                       </div>
-                      
 
-                      <button className="mt-4 w-full py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors group-hover:bg-blue-600 group-hover:text-white">
-                        Bid Now
+                      <button className="mt-4 w-full py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                        Lihat Detail
                       </button>
                     </div>
                   </article>
@@ -267,8 +364,8 @@ export default function App() {
                   key={i}
                   onClick={() => handlePageChange(pageNumber)}
                   className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${currentPage === pageNumber
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
                     }`}
                 >
                   {pageNumber}
