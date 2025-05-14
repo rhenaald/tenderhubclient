@@ -4,6 +4,8 @@ import { apiClient } from "../api/apiService";
 import { Link } from "react-router-dom";
 
 const HomePage = () => {
+    const a = apiClient("/tenders/")
+    console.log(a)
     return (
         <div
             className="page-container bg-cover bg-center bg-no-repeat min-h-screen"
@@ -57,8 +59,8 @@ const HomePage = () => {
             </section>
 
             {/* Why Choose TenderHub */}
-            <section className="text-center my-10 px-4 sm:px-6 md:px-12">
-                <h2 className="text-2xl font-bold text-blue-500 mb-6">Kenapa Pilih TenderHub?</h2>
+            <section className="text-center my-16 px-4 sm:px-6 md:px-12">
+                <h2 className="text-2xl font-bold text-blue-500">Kenapa Pilih TenderHub?</h2>
                 <p className="text-sm text-white font-medium mb-6">Aman, Transparan, dan Profesional</p>
                 <div className="flex flex-wrap gap-6 justify-center">
                     {[
@@ -87,7 +89,7 @@ const HomePage = () => {
             </section>
 
             {/* Testimonials Section */}
-            <section className="text-center my-16 px-4 sm:px-6 md:px-12 py-12">
+            <section className="text-center mt-0 px-4 sm:px-6 md:px-12 py-12">
                 <h2 className="text-2xl font-bold text-blue-500 mb-2">Apa Kata Mereka?</h2>
                 <p className="text-sm text-gray-500 mb-8">Testimonial dari pengguna TenderHub</p>
                 <div className="flex flex-wrap gap-8 justify-center">
@@ -95,7 +97,7 @@ const HomePage = () => {
                         {
                             name: "Andi Wijaya",
                             role: "Freelancer Web Developer",
-                            quote: "Sejak pakai TenderHub, proyek datang lebih konsisten. Sistem escrow-nya bikin kerja lebih tenang karena pembayaran aman.",
+                            quote: "TenderHub mempertemukan saya dengan mitra kerja yang profesional. Komunikasi dan alur kerja jadi jauh lebih efisien.",
                             rating: 5
                         },
                         {
@@ -138,7 +140,7 @@ const HomePage = () => {
             </section>
 
             {/* CTA Section */}
-            <section className="text-center my-16 px-4 sm:px-6 md:px-12 py-12 rounded-lg mx-4">
+            <section className="text-center px-4 sm:px-6 md:px-12 py-12 rounded-lg mx-4">
                 <h2 className="text-2xl font-bold text-neutral-800 mb-4">Siap Memulai Proyek Pertamamu?</h2>
                 <p className="text-neutral-500 mb-6">Bergabunglah dengan ribuan profesional lainnya di TenderHub</p>
                 <div className="flex flex-wrap gap-4 justify-center">
