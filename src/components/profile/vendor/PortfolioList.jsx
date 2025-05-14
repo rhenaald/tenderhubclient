@@ -4,6 +4,7 @@ const PortfolioList = ({ portfolioItems, setIsAddingPortfolio, handleDeletePortf
     const [deletingId, setDeletingId] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
+    const [hoveredItem, setHoveredItem] = useState(null);
 
     const openDeleteConfirm = (item) => {
         setSelectedItem(item);
@@ -20,45 +21,52 @@ const PortfolioList = ({ portfolioItems, setIsAddingPortfolio, handleDeletePortf
 
     return (
         <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {portfolioItems.length > 0 ? (
                     portfolioItems.map((item, index) => (
-                        <div key={index} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                        <div
+                            key={index}
+                            className="relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden border border-gray-100"
+                            onMouseEnter={() => setHoveredItem(item.id)}
+                            onMouseLeave={() => setHoveredItem(null)}
+                        >
                             {item.image && (
-                                <img
-                                    src={`http://127.0.0.1:8000${item.image}`}
-                                    alt={item.title}
-                                    className="w-full h-48 object-cover"
-                                />
+                                <div className="relative aspect-video overflow-hidden">
+                                    <img
+                                        src={`http://127.0.0.1:8000${item.image}`}
+                                        alt={item.title}
+                                        className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                                    />
+                                </div>
                             )}
-                            <div className="p-4">
-                                <h4 className="font-semibold text-lg">{item.title}</h4>
-                                <p className="text-gray-600 text-sm mb-2">
-                                    {new Date(item.date_created).toLocaleDateString('id-ID', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric'
-                                    })}
-                                </p>
-                                <p className="text-gray-700 mb-3 line-clamp-2">{item.description}</p>
+                            <div className="p-5">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h4 className="font-semibold text-lg text-gray-800 line-clamp-1">{item.title}</h4>
+                                    <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded">
+                                        {new Date(item.date_created).toLocaleDateString('id-ID', {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric'
+                                        })}
+                                    </span>
+                                </div>
+                                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{item.description}</p>
                                 <div className="flex justify-between items-center">
-                                    <div className="flex space-x-2">
-                                        {item.link && (
-                                            <a
-                                                href={item.link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-blue-500 hover:text-blue-700 flex items-center"
-                                            >
-                                                <i className="fas fa-external-link-alt mr-1 text-xs"></i>
-                                                Lihat Proyek
-                                            </a>
-                                        )}
-                                    </div>
-                                    <div className="flex space-x-2">
-                                        <button 
+                                    {item.link && (
+                                        <a
+                                            href={item.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-500 hover:text-blue-600 text-sm font-medium flex items-center group"
+                                        >
+                                            <span className="mr-2">View Project</span>
+                                            <i className="fas fa-external-link-alt text-xs transition-transform group-hover:translate-x-0.5"></i>
+                                        </a>
+                                    )}
+                                    <div className="ml-auto">
+                                        <button
                                             onClick={() => openDeleteConfirm(item)}
-                                            className="text-red-500 hover:text-red-700 flex items-center"
+                                            className="text-gray-400 hover:text-red-500 text-sm flex items-center transition-colors"
                                             disabled={deletingId === item.id}
                                         >
                                             {deletingId === item.id ? (
@@ -66,7 +74,7 @@ const PortfolioList = ({ portfolioItems, setIsAddingPortfolio, handleDeletePortf
                                             ) : (
                                                 <i className="fas fa-trash-alt mr-1"></i>
                                             )}
-                                            Hapus
+                                            <span>Delete</span>
                                         </button>
                                     </div>
                                 </div>
@@ -74,17 +82,18 @@ const PortfolioList = ({ portfolioItems, setIsAddingPortfolio, handleDeletePortf
                         </div>
                     ))
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-center col-span-2">
-                        <div className="bg-blue-100 p-4 rounded-full mb-4">
-                            <i className="fas fa-folder-open text-blue-500 text-3xl"></i>
+                    <div className="flex flex-col items-center justify-center py-16 text-center col-span-full">
+                        <div className="bg-blue-50 p-5 rounded-full mb-6 transition-all duration-300 hover:scale-105">
+                            <i className="fas fa-folder-open text-blue-400 text-4xl"></i>
                         </div>
-                        <h4 className="text-lg font-medium text-gray-800 mb-2">Belum ada portfolio</h4>
-                        <p className="text-gray-500 mb-6">Tambahkan portfolio untuk menampilkan karya Anda</p>
+                        <h4 className="text-xl font-medium text-gray-800 mb-3">No portfolio items yet</h4>
+                        <p className="text-gray-500 max-w-md mb-6">Showcase your work by adding your first portfolio item</p>
                         <button
                             onClick={() => setIsAddingPortfolio(true)}
-                            className="bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg px-6 py-2 transition duration-200"
+                            className="bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg px-6 py-2.5 transition-all duration-300 hover:shadow-md"
                         >
-                            Tambah Portfolio
+                            <i className="fas fa-plus mr-2"></i>
+                            Add Portfolio
                         </button>
                     </div>
                 )}
@@ -92,32 +101,37 @@ const PortfolioList = ({ portfolioItems, setIsAddingPortfolio, handleDeletePortf
 
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                        <h3 className="text-lg font-semibold mb-2">Konfirmasi Hapus</h3>
-                        <p className="text-gray-600 mb-4">
-                            Apakah Anda yakin ingin menghapus portfolio "{selectedItem?.title}"? 
-                            Tindakan ini tidak dapat dibatalkan.
-                        </p>
+                <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl animate-fade-in">
+                        <div className="flex items-center mb-4">
+                            <div className="bg-red-100 p-3 rounded-full mr-4">
+                                <i className="fas fa-exclamation-triangle text-red-500 text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800">Delete portfolio?</h3>
+                                <p className="text-gray-500 text-sm">This action cannot be undone.</p>
+                            </div>
+                        </div>
+                        <p className="text-gray-700 mb-6 pl-16">Are you sure you want to delete <span className="font-medium">"{selectedItem?.title}"</span>?</p>
                         <div className="flex justify-end space-x-3">
                             <button
                                 onClick={() => setShowDeleteConfirm(false)}
-                                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition"
+                                className="px-5 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-200"
                             >
-                                Batal
+                                Cancel
                             </button>
                             <button
                                 onClick={confirmDelete}
-                                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition flex items-center"
+                                className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 flex items-center"
                                 disabled={deletingId !== null}
                             >
                                 {deletingId !== null ? (
                                     <>
                                         <i className="fas fa-circle-notch fa-spin mr-2"></i>
-                                        Menghapus...
+                                        Deleting...
                                     </>
                                 ) : (
-                                    <>Hapus</>
+                                    <>Delete</>
                                 )}
                             </button>
                         </div>
