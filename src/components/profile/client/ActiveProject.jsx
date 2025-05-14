@@ -304,17 +304,20 @@ const ActionForm = ({
     const [newPrice, setNewPrice] = useState("");
     const [newDeadline, setNewDeadline] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
+    const [error, setError] = useState(null);
 
-    // Get available actions based on user role and project status
     const getAvailableActions = () => {
         const actions = [{ value: 'comment', label: 'Add Comment' }];
 
         if (isClient) {
             if (projectStatus === "in_progress" || projectStatus === "delivered") {
-                actions.push({ value: 'revision_request', label: 'Request Revision' });
+                actions.push({ value: 'request_revision', label: 'Request Revision' });
             }
 
-            actions.push({ value: 'project_completion', label: 'Mark as Complete' });
+            if (projectStatus === "delivered") {
+            }
+            actions.push({ value: 'complete_project', label: 'Mark as Complete' });
+
             actions.push({ value: 'update_price', label: 'Update Price' });
             actions.push({ value: 'update_deadline', label: 'Update Deadline' });
         }
@@ -328,86 +331,71 @@ const ActionForm = ({
         return actions;
     };
 
-    // Reset form fields
     const resetForm = () => {
         setActionDescription("");
         setActionAttachment(null);
         setNewPrice("");
         setNewDeadline("");
-        // Reset file input if it exists
+        setError(null);
         const fileInput = document.getElementById('activity-file-input');
         if (fileInput) fileInput.value = '';
     };
 
-    // Handle all actions through a unified function
     const handleSubmitAction = async (e) => {
         e.preventDefault();
+        setError(null);
 
-        // Validate input based on action type
-        if (!actionDescription.trim() && selectedAction !== 'update_price' && selectedAction !== 'update_deadline') {
-            return;
-        }
-
+        // Validate inputs
         if (selectedAction === 'update_price' && !newPrice) {
+            setError("Please enter a new price");
             return;
         }
 
         if (selectedAction === 'update_deadline' && !newDeadline) {
+            setError("Please select a new deadline");
             return;
         }
 
         if (selectedAction === 'deliver_project' && !actionAttachment) {
+            setError("Please attach project files");
+            return;
+        }
+
+        if (selectedAction !== 'update_price' && selectedAction !== 'update_deadline' && !actionDescription.trim()) {
+            setError("Please enter a description");
             return;
         }
 
         setActionLoading(true);
 
         try {
-            let endpoint, data, requestConfig = {};
+            let endpoint, data, config = {};
 
-            // Configure request based on action type
             switch (selectedAction) {
                 case 'comment':
                     endpoint = `/projects/${project}/activities/`;
-                    const formData = new FormData();
-                    formData.append("activity_type", "comment");
-                    formData.append("description", actionDescription);
+                    data = new FormData();
+                    data.append("activity_type", "comment");
+                    data.append("description", actionDescription);
                     if (actionAttachment) {
-                        formData.append("attachment", actionAttachment);
+                        data.append("attachment", actionAttachment);
                     }
-                    data = formData;
-                    // Remove Content-Type header for FormData to let browser set it with boundary
-                    requestConfig = {
-                        headers: {
-                            'Content-Type': undefined
-                        }
-                    };
                     break;
 
-                case 'deliver_project':
-                    endpoint = `/projects/${project}/deliver_project/`;
-                    const deliverFormData = new FormData();
-                    deliverFormData.append("description", actionDescription);
-                    deliverFormData.append("attachment", actionAttachment);
-                    data = deliverFormData;
-                    requestConfig = {
-                        headers: {
-                            'Content-Type': undefined
-                        }
-                    };
-                    console.log("Sending delivery request with data:", {
-                        description: actionDescription,
-                        attachmentName: actionAttachment?.name
-                    });
-                    break;
-
-                case 'revision_request':
+                case 'request_revision':
                     endpoint = `/projects/${project}/request_revision/`;
                     data = { description: actionDescription };
                     break;
 
-                case 'project_completion':
-                    endpoint = `/projects/${project}/project_completion/`;
+                case 'deliver_project':
+                    endpoint = `/projects/${project}/deliver_project/`;
+                    data = new FormData();
+                    data.append("description", actionDescription);
+                    data.append("attachment", actionAttachment);
+                    break;
+
+                case 'complete_project':
+                    endpoint = `/projects/${project}/complete_project/`;
                     data = { description: actionDescription };
                     break;
 
@@ -425,14 +413,33 @@ const ActionForm = ({
                     throw new Error("Invalid action type");
             }
 
-            // Make the API call
-            await apiClient.post(endpoint, data, requestConfig);
+            // Make API request
+            const response = await apiClient.post(
+                endpoint,
+                data,
+                selectedAction === 'comment' || selectedAction === 'deliver_project'
+                    ? { headers: { 'Content-Type': 'multipart/form-data' } }
+                    : {}
+            );
 
             resetForm();
             onActionComplete();
 
         } catch (err) {
-            console.error(`Error performing action ${selectedAction}:`, err);
+            console.error(`Error performing ${selectedAction}:`, err);
+            let errorMessage = "Failed to complete action. Please try again.";
+
+            if (err.response?.data) {
+                if (typeof err.response.data === 'object') {
+                    errorMessage = Object.entries(err.response.data)
+                        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                        .join(', ');
+                } else {
+                    errorMessage = err.response.data;
+                }
+            }
+
+            setError(errorMessage);
         } finally {
             setActionLoading(false);
         }
@@ -450,8 +457,8 @@ const ActionForm = ({
         switch (selectedAction) {
             case 'comment': return "Post Comment";
             case 'deliver_project': return "Deliver Project";
-            case 'revision_request': return "Request Revision";
-            case 'project_completion': return "Complete Project";
+            case 'request_revision': return "Request Revision";
+            case 'complete_project': return "Complete Project";
             case 'update_price': return "Update Price";
             case 'update_deadline': return "Update Deadline";
             default: return "Submit";
@@ -460,6 +467,11 @@ const ActionForm = ({
 
     return (
         <div className="border border-gray-200 p-4 rounded-lg bg-white shadow-sm">
+            {error && (
+                <div className="mb-4 p-2 text-sm text-red-600 bg-red-50 rounded border border-red-100">
+                    {error}
+                </div>
+            )}
             <form onSubmit={handleSubmitAction}>
                 <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Select Action</label>
@@ -476,13 +488,12 @@ const ActionForm = ({
                     </select>
                 </div>
 
-                {/* Dynamic form fields based on selected action */}
                 {selectedAction !== 'update_price' && selectedAction !== 'update_deadline' && (
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             {selectedAction === 'deliver_project' ? 'Delivery Description' :
-                                selectedAction === 'revision_request' ? 'Revision Details' :
-                                    selectedAction === 'project_completion' ? 'Completion Notes' :
+                                selectedAction === 'request_revision' ? 'Revision Details' :
+                                    selectedAction === 'complete_project' ? 'Completion Notes' :
                                         'Comment'}
                         </label>
                         <textarea
@@ -491,28 +502,22 @@ const ActionForm = ({
                             placeholder="Enter your details here"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
                             rows="3"
-                            required
                         />
                     </div>
                 )}
 
                 {(selectedAction === 'deliver_project' || selectedAction === 'comment') && (
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Attachment</label>
-                        <div className="flex items-center">
-                            <input
-                                id="activity-file-input"
-                                type="file"
-                                onChange={(e) => setActionAttachment(e.target.files[0])}
-                                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                required={selectedAction === 'deliver_project'}
-                            />
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                            {selectedAction === 'deliver_project'
-                                ? 'Upload your project files here. Max file size: 10MB'
-                                : 'Optional attachment. Max file size: 10MB'}
-                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Attachment {selectedAction === 'deliver_project' && '(Required)'}
+                        </label>
+                        <input
+                            id="activity-file-input"
+                            type="file"
+                            onChange={(e) => setActionAttachment(e.target.files[0])}
+                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            required={selectedAction === 'deliver_project'}
+                        />
                     </div>
                 )}
 
@@ -530,7 +535,7 @@ const ActionForm = ({
                                 className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-7 pr-12 py-2 border border-gray-300 rounded-md text-sm"
                                 min="0"
                                 step="0.01"
-                                required
+                                placeholder="0.00"
                             />
                         </div>
                     </div>
@@ -545,7 +550,6 @@ const ActionForm = ({
                             onChange={(e) => setNewDeadline(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
                             min={new Date().toISOString().split('T')[0]}
-                            required
                         />
                     </div>
                 )}
