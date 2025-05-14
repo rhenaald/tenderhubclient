@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../../api/apiService";
-import ProfileHeader from "../../components/profile/vendor/ProfileHeader";
-import ProfileEditForm from "../../components/profile/vendor/ProfileEditForm";
-import ProfileView from "../../components/profile/vendor/ProfileView";
+import { ProfileHeader, ProfileEditForm, ProfileView } from '../../components/profile/vendor/ProfileView';
 import ProfileTabs from "../../components/profile/vendor/ProfileTabs";
 
 const ProfilePage = () => {
@@ -523,7 +521,7 @@ const ProfilePage = () => {
   };
 
   return (
-    <main className="max-w-4xl mx-auto mt-28 flex flex-col space-y-6 mb-12 px-4">
+    <main className="max-w- mx-auto mt-28 flex flex-col space-y-6 mb-12 px-4">
       {error && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-md" role="alert">
           <p>{error}</p>
@@ -536,7 +534,7 @@ const ProfilePage = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-lg p-6">
+      <div className="bg-white rounded-xl shadow-lg m-10">
         <ProfileHeader
           profileData={profileData}
           editMode={editMode}
@@ -561,24 +559,33 @@ const ProfilePage = () => {
           )
         }
 
-        <div className="flex justify-center">
+        {/* Action Buttons */}
+        <div className="flex justify-end mb-4 mx-6">
           {editMode ? (
-            <div className="flex space-x-4 w-full max-w-md">
+            <div className="flex space-x-4 w-full max-w-md justify-end">
               <button
                 onClick={handleSubmit}
                 disabled={isLoading}
-                className={`flex-1 ${isLoading ? 'bg-blue-300' : 'bg-blue-500 hover:bg-blue-600'} text-white font-medium rounded-lg py-2 text-lg transition duration-200 flex justify-center items-center`}
+                className={`px-6 py-3 flex items-center justify-center rounded-xl font-medium transition-all duration-200 shadow-md hover:shadow-lg text-white ${isLoading ? 'bg-blue-300' : 'bg-blue-600 hover:bg-blue-700'}`}
               >
                 {isLoading ? (
                   <>
                     <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
                     Menyimpan...
                   </>
-                ) : "Simpan"}
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Simpan
+                  </>
+                )}
               </button>
+
               <button
                 onClick={() => {
                   setEditMode(false);
@@ -587,7 +594,7 @@ const ProfilePage = () => {
                   setError(null);
                 }}
                 disabled={isLoading}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg py-2 text-lg transition duration-200"
+                className="px-6 py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 Batal
               </button>
@@ -595,17 +602,20 @@ const ProfilePage = () => {
           ) : (
             <button
               onClick={() => setEditMode(true)}
-              className="w-full max-w-md bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg py-2 text-lg transition duration-200 flex items-center justify-center"
+              className="max-w-md px-6 py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md"
               type="button"
             >
-              <i className="fas fa-edit mr-2"></i>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
               Edit Profil
             </button>
           )}
         </div>
+
       </div >
 
-      <div className="mt-8">
+      <div className="mx-10">
         <ProfileTabs
           activeTab={activeTab}
           setActiveTab={setActiveTab}
