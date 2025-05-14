@@ -26,7 +26,8 @@ export default function ProjectDetail() {
   const [editCommentContent, setEditCommentContent] = useState("");
   const commentSectionRef = useRef(null);
 
-  console.log("Project ID:", comments);
+  const a = apiClient.get(`/tenders/${id}/`);
+  console.log(a);
   
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user_data'));
@@ -53,70 +54,27 @@ export default function ProjectDetail() {
       try {
         // Fetch comments
         const commentsResponse = await apiClient.get(`/comments/?tender_id=${id}`);
-        let commentsData = commentsResponse.data.results || commentsResponse.data;
-        if (!Array.isArray(commentsData)) {
-          commentsData = [];
-        }
+        let commentsData = commentsResponse.data.results || [];
 
-        // Fetch vendors data
-        const vendorsResponse = await apiClient.get('/users/vendors/');
-        const vendorsData = vendorsResponse.data.results || vendorsResponse.data;
-        console.log("Vendors Data:", vendorsData);
-        const vendorsMap = new Map();
-
-        // Create a map of vendor usernames to their data
-        if (Array.isArray(vendorsData)) {
-          vendorsData.forEach(vendor => {
-            if (vendor.user) {
-              vendorsMap.set(vendor.user, vendor);
-            }
-          });
-        }
-        console.log("Vendors Map:", vendorsMap);
-        const transformedComments = commentsData.map(comment => {
-          // Default user data from comment
-          const userFromComment = {
-            id: comment.user?.id || comment.user,
-            name: comment.user?.name || comment.user_name,
-            profile_picture: comment.user?.profile_picture || comment.user_picture,
-            user_type: comment.user?.user_type || comment.user_type || 'client'
-          };
-
-          // If user is a vendor, try to match with vendors data
-          if (userFromComment.user_type === 'vendor' && userFromComment.name) {
-            const matchedVendor = vendorsMap.get(userFromComment.name);
-            if (matchedVendor) {
-              return {
-                id: comment.comment_id || comment.id,
-                tender_id: comment.tender || comment.tender_id,
-                user: {
-                  id: matchedVendor.id, // Use vendor ID from vendors endpoint
-                  name: matchedVendor.name || userFromComment.name,
-                  profile_picture: matchedVendor.profile_picture || userFromComment.profile_picture,
-                  user_type: 'vendor' // Ensure type is vendor
-                },
-                content: comment.content,
-                created_at: comment.created_at,
-                updated_at: comment.updated_at
-              };
-            }
-          }
-
-          // Default case (not a vendor or no match found)
-          return {
-            id: comment.comment_id || comment.id,
-            tender_id: comment.tender || comment.tender_id,
-            user: userFromComment,
-            content: comment.content,
-            created_at: comment.created_at,
-            updated_at: comment.updated_at
-          };
-        });
+        // Transform comments data to match expected format
+        const transformedComments = commentsData.map(comment => ({
+          id: comment.comment_id,
+          tender_id: comment.tender,
+          user: {
+            id: comment.user,
+            name: comment.user_name,
+            profile_picture: comment.user_picture,
+            user_type: comment.user_type
+          },
+          content: comment.content,
+          created_at: comment.created_at,
+          updated_at: comment.created_at // Assuming no updated_at field, using created_at
+        }));
 
         setComments(transformedComments);
       } catch (err) {
         setComments([]);
-        console.error("Error fetching comments or vendors:", err);
+        console.error("Error fetching comments:", err);
       } finally {
         setIsLoadingComments(false);
       }
@@ -127,7 +85,8 @@ export default function ProjectDetail() {
 
       setIsLoadingBids(true);
       try {
-        const response = await apiClient.get(`/bids/?tender_id=${id}`);
+        const response = await apiClient.get(`/bids/?tender_id=${id}&user_id=${userData.user_id}`);
+        // Filter bids to only include those for this project (redundant if API already filters)
         const filteredBids = response.data.results.filter(bid => bid.tender == id);
 
         setUserBids(filteredBids || []);
@@ -137,7 +96,6 @@ export default function ProjectDetail() {
         setIsLoadingBids(false);
       }
     };
-
     if (id) {
       fetchProjectDetail();
       fetchSimilarProjects();
@@ -344,14 +302,14 @@ export default function ProjectDetail() {
 
   return (
     <>
-      <div className="bg-gray-100 py-4">
+      <div className="bg-gray-100 py-4 mt-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <nav className="text-sm">
             <Link to="/" className="text-[#5B8CFF] hover:underline">
               Home
             </Link>{" "}
             /{" "}
-            <Link to="/" className="text-[#5B8CFF] hover:underline">
+            <Link to="/projects" className="text-[#5B8CFF] hover:underline">
               Projects
             </Link>{" "}
             / <span className="text-gray-600">{project.title}</span>
@@ -359,7 +317,7 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 pb-8">
         <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
           <div className="mb-6">
             <span className="bg-green-500 text-white text-xs sm:text-sm font-semibold px-3 py-1 rounded-full">
@@ -713,6 +671,14 @@ export default function ProjectDetail() {
                   {formatDate(project.deadline)}
                 </p>
               </div>
+
+              {/* categories project */}
+              <div className="mb-4 pb-4 border-b border-gray-200">
+                <p className="text-gray-600 text-sm mb-1">Deadline</p>
+                <p className="font-bold text-blue-400">
+                  {project.category.name}
+                </p>
+              </div>
               
               {project.tags_data && project.tags_data.length > 0 && (
                 <div className="mb-4 pb-4 border-b border-gray-200">
@@ -721,11 +687,11 @@ export default function ProjectDetail() {
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {project.tags_data
-                      .filter(tag => tag?.id && tag?.name) // Filter hanya tag yang valid
-                      .map(tag => (
+                      
+                      .map((tag, index) => (
                         <span
-                          key={`tag-${tag.id}`}
-                          className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                          key={`tag-${index}`} // Gunakan index jika tidak ada id
+                          className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-gray-800"
                         >
                           {tag.name}
                         </span>
@@ -734,17 +700,6 @@ export default function ProjectDetail() {
                   </div>
                 </div>
               )}
-
-              <div className="mb-4 pb-4 border-b border-gray-200">
-                <p className="text-gray-600 text-sm mb-1">Category</p>
-                <div className="mt-1">
-                  {project.category && (
-                    <span className="bg-[#5B8CFF] text-white text-xs font-medium rounded-full py-1 px-3">
-                      {project.category.name}
-                    </span>
-                  )}
-                </div>
-              </div>
 
               <div className="mb-4">
                 <p className="text-gray-600 text-sm mb-1">Comments</p>
@@ -794,6 +749,7 @@ export default function ProjectDetail() {
                     </div>
 
                     <div className="p-4 flex flex-col flex-grow">
+                      <Link to={`/client/profile/${project.client}`}>
                       <div className="flex items-center space-x-2 mb-2">
                         <img
                           src={`http://127.0.0.1:8000${project.client_picture}`}
@@ -804,6 +760,7 @@ export default function ProjectDetail() {
                           {project.client_name}
                         </span>
                       </div>
+                      </Link>
 
                       <h3 className="text-[#5B8CFF] text-sm font-semibold leading-snug line-clamp-2 mb-2">
                         {project.title}
@@ -812,10 +769,9 @@ export default function ProjectDetail() {
                       {project.tags_data && project.tags_data.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-3">
                           {project.tags_data
-                            .filter(tag => tag?.id && tag?.name)
-                            .map(tag => (
+                            .map((tag, index) => (
                               <span
-                                key={`tag-${tag.id}`}
+                                key={`tag-${index}`}
                                 className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
                               >
                                 {tag.name}
