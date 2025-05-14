@@ -7,7 +7,8 @@ import {
 } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import { apiClient, authService } from "./api/apiService";
+import { authService } from "./api/apiService";
+import { useEffect, useState } from "react";
 
 import HomePage from "./pages/HomePage";
 import Projek from "./pages/Projek";
@@ -44,8 +45,6 @@ const PrivateRoute = ({ children, allowedUserTypes }) => {
 function LayoutWrapper() {
   const location = useLocation();
   const hiddenRoutes = ["/register", "/login"];
-
-  const test = apiClient("/tenders")
 
   return (
     <>
@@ -105,6 +104,34 @@ function LayoutWrapper() {
 }
 
 export default function App() {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    // Check authentication status on app start
+    const initializeAuth = async () => {
+      try {
+        // Check if user is authenticated
+        if (authService.isAuthenticated()) {
+          // Optionally, verify the token validity here
+          await authService.determineUserType();
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        // Handle failed initialization (e.g., invalid token)
+        authService.logout();
+      } finally {
+        setIsInitialized(true);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  if (!isInitialized) {
+    // You could show a loading spinner here
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
   return (
     <Router>
       <LayoutWrapper />
