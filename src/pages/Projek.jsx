@@ -57,7 +57,7 @@ export default function App() {
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">
               Temukan Proyek <span className="text-blue-600">Sesuai Keahlianmu</span>
             </h1>
-            <p className="text-gray-200 text-lg max-w-lg mx-auto leading-relaxed font-medium">
+            <p className="text-gray-100 text-lg max-w-lg mx-auto leading-relaxed font-medium">
               Proyek terbaru dari klien di seluruh dunia. Mulai bid sekarang dan tunjukkan keahlian profesionalmu.
             </p>
           </div>
@@ -68,7 +68,7 @@ export default function App() {
               placeholder="Cari proyek (mis: desain web, mobile app)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full py-4 px-5 pr-14 rounded-xl bg-white border-2 border-gray-200 shadow-sm focus:shadow-md focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200 text-gray-900 placeholder-gray-500 font-medium"
+              className="w-full py-4 px-5 pr-14 rounded-full bg-white border-2 border-gray-200 shadow-sm focus:shadow-md focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all duration-200 text-gray-900 placeholder-gray-500 font-medium"
             />
             <button className="absolute right-3 top-3 p-2 rounded-lg bg-blue-500 hover:bg-blue-600 transition-colors duration-200">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
