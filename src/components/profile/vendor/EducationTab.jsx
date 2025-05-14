@@ -154,8 +154,8 @@ const EducationTab = ({
                                 type="submit"
                                 disabled={isLoading}
                                 className={`px-5 py-2.5 rounded-lg font-medium text-white transition-all flex items-center justify-center ${isLoading
-                                        ? 'bg-blue-400 cursor-not-allowed'
-                                        : 'bg-blue-500 hover:bg-blue-600 shadow-sm hover:shadow-md'
+                                    ? 'bg-blue-400 cursor-not-allowed'
+                                    : 'bg-blue-500 hover:bg-blue-600 shadow-sm hover:shadow-md'
                                     }`}
                             >
                                 {isLoading ? (
