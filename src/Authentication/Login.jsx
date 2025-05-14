@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { authService } from "../api/apiService";
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function TenderHubLogin() {
     const navigate = useNavigate();
@@ -9,6 +10,11 @@ export default function TenderHubLogin() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+
+    const togglePasswordVisibility = () => {
+        setShowPassword(!showPassword);
+    };
 
     // Check for messages from registration or other pages
     const message = location.state?.message || "";
@@ -127,26 +133,36 @@ export default function TenderHubLogin() {
                     />
 
                     <label htmlFor="password" className="font-semibold text-base mb-2">Kata Sandi</label>
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        autoComplete="current-password"
-                        placeholder="Masukan Kata Sandi"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="w-full rounded-full bg-gray-200 px-5 py-3 text-sm text-gray-600 mb-2 focus:outline-none focus:bg-[#f5faff] focus:ring-2 focus:ring-[#5a8ff9]"
-                    />
-
-                    <div className="text-right text-sm mb-5">
-                        <a href="/forgot-password" className="text-[#5a8ff9] font-medium hover:underline">Lupa kata sandi?</a>
+                    <div className="relative">
+                        <input
+                            type={showPassword ? "text" : "password"}
+                            id="password"
+                            name="password"
+                            autoComplete="current-password"
+                            placeholder="Masukan Kata Sandi"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            className="w-full rounded-full bg-gray-200 px-5 py-3 text-sm text-gray-600 mb-2 focus:outline-none focus:bg-[#f5faff] focus:ring-2 focus:ring-[#5a8ff9] pr-12"
+                        />
+                        <button
+                            type="button"
+                            onClick={togglePasswordVisibility}
+                            className="absolute right-4 top-3 text-gray-500 hover:text-gray-700 focus:outline-none"
+                            aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                        >
+                            {showPassword ? (
+                                <EyeOff size={20} />
+                            ) : (
+                                <Eye size={20} />
+                            )}
+                        </button>
                     </div>
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-[#5a8ff9] hover:bg-[#4a7de6] text-white font-semibold text-lg py-3 rounded-full mb-5 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        className="w-full bg-[#5a8ff9] hover:bg-[#4a7de6] text-white font-semibold text-lg py-3 rounded-full mb-5 disabled:bg-gray-400 disabled:cursor-not-allowed mt-4"
                     >
                         {loading ? "Memproses..." : "Masuk"}
                     </button>
