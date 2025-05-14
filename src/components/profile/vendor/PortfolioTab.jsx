@@ -16,14 +16,17 @@ const PortfolioTab = ({
 }) => {
     return (
         <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="font-semibold text-xl text-gray-800">Portfolio Saya</h3>
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    <h3 className="text-2xl font-bold text-gray-800">Portfolio Saya</h3>
+                    <p className="text-gray-500 text-sm mt-1">Kumpulan karya dan proyek terbaik Anda</p>
+                </div>
                 {!isAddingPortfolio && (
                     <button
-                        className="text-blue-500 hover:text-blue-600 flex items-center"
+                        className="bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg px-5 py-2.5 transition-all duration-300 hover:shadow-md flex items-center"
                         onClick={() => setIsAddingPortfolio(true)}
                     >
-                        <i className="fas fa-plus-circle mr-1"></i>
+                        <i className="fas fa-plus mr-2 text-sm"></i>
                         Tambah Portfolio
                     </button>
                 )}
