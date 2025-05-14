@@ -15,18 +15,18 @@ const ProfileHeader = ({
     return (
         <div className="min-h-screen">
             {/* Header Background dengan opacity lebih rendah */}
-            <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-r from-blue-400 to-blue-500 opacity-20 z-0"></div>
+            <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-r opacity-20 z-0"></div>
 
             <div className="max-w-full mx-auto relative z-10 pt-16">
                 {/* Profile Card */}
                 <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
                     {/* Cover Photo dengan blur */}
-                    <div className="h-48 bg-gradient-to-r from-indigo-300 to-purple-400 relative overflow-hidden">
+                    <div className="h-48 bg-neutral-800 relative overflow-hidden">
                         {/* Blurred profile picture sebagai cover */}
                         <img
                             src={profileData.profile_picture || "https://avatars.dicebear.com/api/initials/" + fullName + ".svg"}
                             alt="Cover"
-                            className="w-full h-full object-cover filter blur-md opacity-60"
+                            className="w-full h-full object-cover filter blur-md opacity-80"
                         />
 
                         {editMode && (
