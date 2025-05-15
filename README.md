@@ -1,12 +1,85 @@
-# React + Vite
+# TenderHub Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+TenderHubClient adalah aplikasi frontend berbasis React & Vite untuk platform manajemen tender/proyek yang memungkinkan klien dan vendor untuk berinteraksi secara efisien. Aplikasi ini mendukung sistem autentikasi, peran pengguna (admin, klien, vendor), serta fitur profil dan manajemen proyek.
 
-Currently, two official plugins are available:
+## ✨ Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+* React
+* Vite
+* React Router
+* Tailwind CSS
+* ESLint
 
-## Expanding the ESLint configuration
+## 📆 Instalasi
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. Clone repositori:
+
+```bash
+git clone https://github.com/rhenaald/tenderhubclient.git
+cd tenderhubclient
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Jalankan server development:
+
+```bash
+npm run dev
+```
+
+## 🔐 Role-based Access
+
+Aplikasi ini menggunakan sistem autentikasi dan pembatasan akses berdasarkan jenis pengguna:
+
+* **Public**: Tidak perlu login
+* **Private (client, vendor, admin)**: Hanya bisa diakses sesuai peran
+
+## 📍 Route & Akses
+
+| Route                    | Komponen              | Akses                     |
+| ------------------------ | --------------------- | ------------------------- |
+| `/`                      | `HomePage`            | Public                    |
+| `/projects`              | `Projek`              | Public                    |
+| `/projects/:id`          | `DetailProjek`        | Public                    |
+| `/register`              | `Registration`        | Public                    |
+| `/login`                 | `Login`               | Public                    |
+| `/vendor/profile/:id`    | `VendorProfile`       | Public                    |
+| `/client/profile/:id`    | `ClientProfile`       | Public                    |
+| `/forbidden`             | `Forbidden`           | Public                    |
+| `/profile-vendor`        | `ProfileVendor`       | Private (Vendor only)     |
+| `/profile-client`        | `ProfileClient`       | Private (Client only)     |
+| `/ProjectDetail/:id`     | `ProjectDetail`       | Private (Client only)     |
+| `/dashboard`             | `Dashboard`           | Private (Admin only)      |
+| `/Activity-projects/:id` | `ActiveProjectDetail` | Private (Client & Vendor) |
+| `*`                      | `NotFound`            | Public                    |
+
+## 🔐 Mekanisme Private Route
+
+Akses ke route privat dikontrol oleh komponen `PrivateRoute`, yang memverifikasi:
+
+* Apakah pengguna sudah login
+* Apakah peran pengguna sesuai dengan izin yang diberikan di route
+
+Jika gagal, pengguna diarahkan ke halaman `/login` atau `/forbidden`.
+
+## 📁 Struktur Proyek
+
+```
+tenderhubclient/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── Authentication/
+│   ├── api/
+│   ├── App.jsx
+│   └── main.jsx
+├── public/
+├── package.json
+├── vite.config.js
+├── eslint.config.js
+└── README.md
+```
